@@ -1,2 +1,4 @@
 huggingface_hub[cli]
 ffmpeg-python
+torch
+transformers
