@@ -1,5 +1,3 @@
-"""NLLB-200 language code mappings."""
-
 LANGUAGE_CODES = {
     'Chinese':      'zho_Hans',
     'English':      'eng_Latn',
