@@ -1,0 +1,15 @@
+languages:
+  Chinese: "zho_Hans"
+  English: "eng_Latn"
+  Japanese: "jpn_Jpan"
+  Korean: "kor_Hang"
+  German: "deu_Latn"
+  French: "fra_Latn"
+  Russian: "rus_Cyrl"
+  Portuguese: "por_Latn"
+  Spanish: "spa_Latn"
+  Italian: "ita_Latn"
+
+metadata:
+  total_supported: 10
+  default_source: "eng_Latn"
