@@ -2,9 +2,9 @@ import os
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
 
-model_name_original = "facebook/nllb-200-3.3B"
-model_name_green = "facebook/nllb-200-distilled-1.3B" # distilled means compressed - less processing power = green computing
-model_name_tiny = "facebook/nllb-200-distilled-600M" # using this smaller model for testing to save compute
+MODEL_ORIGINAL = "facebook/nllb-200-3.3B"
+MODEL_GREEN = "facebook/nllb-200-distilled-1.3B" # distilled means compressed - less processing power = green computing
+MODEL_TINY = "facebook/nllb-200-distilled-600M" # using this smaller model for testing to save compute
 
 def load_translator(model_name):
     hf_token = os.getenv("HF_TOKEN")
@@ -26,5 +26,5 @@ def translate_text(model, tokenizer, text, language_from, language_to):
 
     return tokenizer.batch_decode(gen_tokens, skip_special_tokens=True)
 
-# model, tokenizer = load_translator(model_name_tiny)
+# model, tokenizer = load_translator(MODEL_TINY)
 # print(translate_text(model, tokenizer, "good morning", "eng_Latn", "fra_Latn"))
