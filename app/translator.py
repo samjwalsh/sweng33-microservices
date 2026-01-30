@@ -23,5 +23,5 @@ def translate_text(model, tokenizer, text, language_from, language_to):
 
     return tokenizer.batch_decode(gen_tokens, skip_special_tokens=True)
 
-# model, tokenizer = load_translator(tiny)
-# print(translate_text(model, tokenizer, "good morning", "eng_Latn", "fra_Latn"))
+# model, tokenizer = load_translator("tiny")
+# print(translate_text(model, tokenizer, "good morning", "English", "French"))
