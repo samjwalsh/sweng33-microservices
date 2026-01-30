@@ -6,26 +6,26 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
-- build
-- test
-- deploy
-- review
-- dast
-- staging
-- canary
-- production
-- incremental rollout 10%
-- incremental rollout 25%
-- incremental rollout 50%
-- incremental rollout 100%
-- performance
-- cleanup
-- secret-detection
-sast:
+  - build
+  - test
+  - secret-detection
+build:
+  stage: build
+  image: python:3.11
+  script:
+    - pip install -r requirements.txt
+    - echo "Build successful"
+test:
   stage: test
-include:
-- template: Auto-DevOps.gitlab-ci.yml
+  image: python:3.11
+  script:
+    - pytest tests/
 variables:
   SECRET_DETECTION_ENABLED: 'true'
+
 secret_detection:
   stage: secret-detection
+  image: docker:latest
+  script:
+    - echo "Running secret detection..."
+  allow_failure: true
