@@ -14,6 +14,8 @@ cache:
 test:
   stage: test
   image: python:3.11-slim
+  tags:        
+    - docker
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends ffmpeg git
     
