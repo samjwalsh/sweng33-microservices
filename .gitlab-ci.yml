@@ -1,0 +1,47 @@
+stages:
+  - test
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONPATH: "." 
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .cache/pip
+    - .venv/
+
+test:
+  stage: test
+  image: python:3.11-slim
+  tags:        
+    - docker
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends ffmpeg git
+    
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    
+    - pip install -r requirements.txt
+
+  script:
+    - source .venv/bin/activate
+    - pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
+
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+      junit: report.xml
+    paths:
+      - coverage.xml
+      - report.xml
+    expire_in: 30 days
+  
+  rules:
+    - when: always

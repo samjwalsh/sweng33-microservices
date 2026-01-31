@@ -1,4 +1,8 @@
 huggingface_hub[cli]
 ffmpeg-python
-torch
+torch --index-url https://download.pytorch.org/whl/cpu
 transformers
+
+pytest
+pytest-cov
+pyyaml
