@@ -1,0 +1,16 @@
+
+# Qwen3-TTS Proof Of Concept
+research/qwen3_tts_poc/outputs/
+research/qwen3_tts_poc/samples/*.wav
+
+# Python / env
+.venv/
+__pycache__/
+*.pt
+*.bin
+*.safetensors
+.cache/
+
+# macOS junk
+.DS_Store
+
