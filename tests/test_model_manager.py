@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from app.model_manager import ModelManager
-import os
 
 TEST_CONFIG_PATH = "tests/test_config.yaml"
 DUMMY_MODEL_NAME = "translation"
