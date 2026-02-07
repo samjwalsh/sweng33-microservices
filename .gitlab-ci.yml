@@ -21,6 +21,7 @@ test:
     
     - python -m venv .venv
     - source .venv/bin/activate
+    - touch coverage.xml report.xml
     - pip install --upgrade pip
     - pip install pytest pytest-cov
     - pip install -r requirements.txt
