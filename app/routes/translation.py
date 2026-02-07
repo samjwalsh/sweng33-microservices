@@ -35,6 +35,15 @@ def translate(request: Request, translation_request: TranslationRequest):
             }
         )
     
+    if translation_request.language_from == translation_request.language_to:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                'error': f'Source and target languages cannot be the same: {translation_request.language_from}'
+            }
+        )
+    
+    
     model = model_manager.get_model("translation")
     tokenizer = model_manager.get_tokenizer("translation")
 
