@@ -1,64 +1,92 @@
 import pytest
-from unittest.mock import patch, MagicMock
-from app.model_manager import ModelManager
+from fastapi.testclient import TestClient
+from unittest.mock import Mock, patch
+from fastapi import FastAPI
 
-TEST_CONFIG_PATH = "tests/test_config.yaml"
-DUMMY_MODEL_NAME = "translation"
+from app.routes import translation
 
 @pytest.fixture
-def model_manager(monkeypatch):
-    monkeypatch.setenv(
-        "AZURE_STORAGE_CONNECTION_STRING", # fake azure connection string for tests
-        "DefaultEndpointsProtocol=https;AccountName=dummy;AccountKey=dummy;EndpointSuffix=core.windows.net"
-    )
-
-    with patch("app.model_manager.BlobServiceClient") as mock_blob:
-        mock_container_client = MagicMock()
-        mock_blob.from_connection_string.return_value.get_container_client.return_value = mock_container_client
-
-        dummy_blob = MagicMock()
-        dummy_blob.name = "dummy_file.bin"
-        dummy_blob.size = 10
-        mock_container_client.list_blobs.return_value = [dummy_blob]
-
-        mock_blob_client = MagicMock()
-        mock_blob_client.download_blob.return_value.readall.return_value = b"dummy"
-        mock_container_client.get_blob_client.return_value = mock_blob_client
-
-        with patch("torch.cuda.is_available", return_value=True):
-            yield ModelManager(config_path=TEST_CONFIG_PATH)
-
-
-@patch("app.model_manager.AutoTokenizer.from_pretrained")
-@patch("app.model_manager.AutoModelForSeq2SeqLM.from_pretrained")
-def test_load_model_seq2seq(mock_model, mock_tokenizer, model_manager):
-    mock_tokenizer.return_value = "tokenizer_obj"
-    mock_model.return_value = "model_obj"
+def mock_model_manager():
+    manager = Mock()
+    manager.device = "cuda"
     
-    result = model_manager.load_model(DUMMY_MODEL_NAME)
+    model = Mock()
+    model.device = "cuda"
+    model.generate = Mock(return_value=Mock())
+    
+    tokenizer = Mock()
+    tokenizer.src_lang = None
+    tokenizer.return_value = Mock(to=Mock(return_value=Mock()))
+    tokenizer.convert_tokens_to_ids = Mock(return_value=12345)
+    tokenizer.batch_decode = Mock(return_value=["Bonjour"])
+    
+    manager.get_model = Mock(return_value=model)
+    manager.get_tokenizer = Mock(return_value=tokenizer)
+    return manager
 
-    assert model_manager.get_model(DUMMY_MODEL_NAME) == "model_obj"
-    assert model_manager.get_tokenizer(DUMMY_MODEL_NAME) == "tokenizer_obj"
-    assert result is True
+@pytest.fixture
+def client(mock_model_manager):
+    app = FastAPI()
+    app.state.model_manager = mock_model_manager
+    app.include_router(translation.router, prefix="/translate")
+    return TestClient(app)
 
-def test_get_device_info(model_manager):
-    info = model_manager.get_device_info()
-    assert info["device"] in ["cuda", "cpu"]
-    assert "gpu_available" in info
+class TestTranslateEndpoint:
+    def test_translate_success(self, client):
+        response = client.post(
+            "/translate/",
+            json={
+                "text": "Hello",
+                "language_from": "English",
+                "language_to": "French"
+            }
+        )
+        data = response.json()
+        
+        assert response.status_code == 200
+        assert data["translation"] == "Bonjour"
+        assert data["language_from"] == "English"
+        assert data["language_to"] == "French"
+        assert data["original_text"] == "Hello"
+        assert isinstance(data["inference_time_ms"], float)
+    
+    def test_translate_error_handling(self, client):
+        response = client.post(
+            "/translate/",
+            json={"text": "Hello", "language_from": "InvalidLang", "language_to": "French"}
+        )
+        assert response.status_code == 400
+        
+        client.app.state.model_manager.get_model = Mock(return_value=None)
+        response = client.post(
+            "/translate/",
+            json={"text": "Hello", "language_from": "English", "language_to": "French"}
+        )
+        assert response.status_code == 500
 
-def test_missing_connection_string(monkeypatch):
-    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
-    with pytest.raises(ValueError):
-        mm = ModelManager(config_path=TEST_CONFIG_PATH)
-        mm._download_model_from_blob(DUMMY_MODEL_NAME)
-
-def test_invalid_model_name(model_manager):
-    with pytest.raises(KeyError):
-        model_manager.load_model("nonexistent_model")
-
-@pytest.mark.skip(reason="requires real small model in Azure for end-to-end test")
-def test_load_real_model():
-    from app.model_manager import ModelManager
-    mm = ModelManager(config_path="tests/test_real_model_config.yaml")
-    mm.load_all_models()
-    assert "translation" in mm.models
+class TestBatchTranslateEndpoint:
+    def test_batch_translate_success(self, client):
+        response = client.post(
+            "/translate/batch",
+            json={
+                "texts": ["Hello", "Goodbye"],
+                "language_from": "English",
+                "language_to": "French"
+            }
+        )
+        data = response.json()
+        
+        assert response.status_code == 200
+        assert data["count"] == 2
+        assert len(data["translations"]) == 2
+        assert isinstance(data["total_time_ms"], float)
+    
+    def test_batch_translate_validation(self, client):
+        response = client.post("/translate/batch", json={"texts": []})
+        assert response.status_code == 422
+        
+        response = client.post(
+            "/translate/batch",
+            json={"texts": ["Hello"], "language_from": "InvalidLang", "language_to": "French"}
+        )
+        assert response.status_code == 400
