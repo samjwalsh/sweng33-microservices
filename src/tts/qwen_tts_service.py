@@ -6,7 +6,6 @@ from typing import Iterable, Optional
 
 import soundfile as sf
 import torch
-from qwen_tts import Qwen3TTSModel
 
 
 @dataclass(frozen=True)
@@ -54,13 +53,14 @@ class QwenTTSService:
 
     def _load_model(self):
         if self._model is None:
-            self._model = Qwen3TTSModel.from_pretrained(
-                self.model_id,
-                device_map=self.device_map,
-                dtype=self.dtype,
-            )
+           from qwen_tts import Qwen3TTSModel  # lazy import
+           self._model = Qwen3TTSModel.from_pretrained(
+               self.model_id,
+               device_map=self.device_map,
+               dtype=self.dtype,
+           )
         return self._model
-
+  
     def _map_speaker(self, speaker_label: str) -> str:
         """
         Deterministic mapping: any speaker label maps to a stable voice in speaker_pool.
