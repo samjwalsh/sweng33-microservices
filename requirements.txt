@@ -2,7 +2,7 @@ huggingface_hub[cli]
 ffmpeg-python
 torch --index-url https://download.pytorch.org/whl/cpu
 transformers
-
+soundfile
 pytest
 pytest-cov
 pyyaml
