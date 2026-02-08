@@ -1,15 +1,15 @@
 models:
   translation:
-    container_name: "models"
-    blob_prefix: "translation/"
-    model_type: "seq2seq"
+    source: disk
+    path: /mnt/models/translation
+    model_type: seq2seq
 
   transcription:
-    container_name: "models"
-    blob_prefix: "transcription/"
-    model_type: "asr"
+    source: disk
+    path: /mnt/models/transcription
+    model_type: asr
 
   tts:
-    container_name: "models"
-    blob_prefix: "text-to-speech/"
-    model_type: "text-to-speech"
+    source: disk
+    path: /mnt/models/tts
+    model_type: tts

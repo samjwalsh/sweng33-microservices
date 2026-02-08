@@ -1,41 +1,44 @@
-from fastapi import APIRouter, Request
-from app.schemas import HealthResponse, LanguagesResponse
-from config.model_config import LANGUAGE_CODES
+from fastapi import APIRouter
+from azure.storage.blob import BlobServiceClient
+import os
 
 router = APIRouter()
 
-@router.get("/health", response_model=HealthResponse)
-def health(request: Request):
-    model_manager = request.app.state.model_manager
-    device_info = model_manager.get_device_info()
-    loaded_models = list(model_manager.models.keys())
-    
-    return {
-        "status": "healthy",
-        "loaded_models": loaded_models,
-        "total_models": len(loaded_models),
-        "device": device_info
+@router.get("/blob-health")
+def blob_health():
+    """
+    Check that models exist on Azure Blob Storage.
+    Returns a dictionary per model indicating whether blobs are accessible.
+    """
+    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    if not connection_string:
+        return {"status": "failed", "reason": "AZURE_STORAGE_CONNECTION_STRING not set"}
+
+    results = {}
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+    except Exception as e:
+        return {"status": "failed", "reason": f"Failed to connect to Blob Storage: {str(e)}"}
+
+    model_config = {
+        "translation": {"container_name": "models", "blob_prefix": "translation/"},
+        "transcription": {"container_name": "models", "blob_prefix": "transcription/"},
+        "tts": {"container_name": "models", "blob_prefix": "tts/"},
     }
 
-@router.get("/device")
-def device_info(request: Request):
-    model_manager = request.app.state.model_manager
-    return model_manager.get_device_info()
+    for model_name, cfg in model_config.items():
+        try:
+            container_client = blob_service_client.get_container_client(cfg["container_name"])
+            blobs = list(container_client.list_blobs(name_starts_with=cfg["blob_prefix"]))
+            if blobs:
+                results[model_name] = {"accessible": True, "file_count": len(blobs)}
+            else:
+                results[model_name] = {"accessible": False, "reason": "No blobs found with prefix"}
+        except Exception as e:
+            results[model_name] = {"accessible": False, "reason": str(e)}
 
-@router.get("/models")
-def list_models(request: Request):
-    model_manager = request.app.state.model_manager
-    models_info = {}
-    for model_name in model_manager.config['models'].keys():
-        models_info[model_name] = {
-            'loaded': model_name in model_manager.models,
-            'type': model_manager.config['models'][model_name]['model_type']
-        }
-    return models_info
+    return results
 
-@router.get("/languages", response_model=LanguagesResponse)
-def list_languages():
-    return {
-        "supported_languages": list(LANGUAGE_CODES.keys()),
-        "total": len(LANGUAGE_CODES)
-    }
+
+
+

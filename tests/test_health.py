@@ -14,7 +14,7 @@ def mock_model_manager():
         'models': {
             'translation': {'model_type': 'seq2seq'},
             'asr': {'model_type': 'asr'},
-            'tts': {'model_type': 'text-to-speech'}
+            'tts': {'model_type': 'tts'}
         }
     }
     manager.get_device_info.return_value = {

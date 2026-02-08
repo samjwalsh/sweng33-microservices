@@ -1,4 +1,3 @@
-from azure.storage.blob import BlobServiceClient
 from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
@@ -9,8 +8,6 @@ import os
 import yaml
 import torch
 import warnings
-import tempfile
-import shutil
 
 class ModelManager:
     def __init__(self, config_path="config/models_config.yaml"):
@@ -27,91 +24,41 @@ class ModelManager:
     def _load_config(self, config_path):
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
-    
-    def _download_model_from_blob(self, model_name): # load from Azure blob
-        if not self.connection_string:
-            raise ValueError("ERROR: Azure Blob Storage connection string not found. Set AZURE_STORAGE_CONNECTION_STRING in your environment\n")
-        
-        try:
-            model_config = self.config["models"][model_name]
-            container_name = model_config["container_name"]
-            blob_prefix = model_config.get("blob_prefix", '')
-            temp_dir = tempfile.mkdtemp(prefix=f"{model_name}_")
-            
-            blob_service_client = BlobServiceClient.from_connection_string(self.connection_string)
-            container_client = blob_service_client.get_container_client(container_name)
-            blob_list = list(container_client.list_blobs(name_starts_with=blob_prefix))
-            
-            if not blob_list:
-                raise ValueError(f"No files found in container '{container_name}'")
-            
-            for blob in blob_list:
-                local_file_name = blob.name.replace(blob_prefix, '', 1) if blob_prefix else blob.name
-                download_path = os.path.join(temp_dir, local_file_name)
-                
-                os.makedirs(os.path.dirname(download_path), exist_ok=True)
-                blob_client = container_client.get_blob_client(blob.name)
-                
-                with open(download_path, "wb") as f:
-                    f.write(blob_client.download_blob().readall())
-            
-            return temp_dir
-                
-        except Exception as e:
-            raise RuntimeError(f"Failed to load model from Azure: {str(e)}") from e
-    
-    def load_model(self, model_name): # load to GPU/CPU memory
+
+    def load_model(self, model_name):
         model_config = self.config["models"][model_name]
         model_type = model_config["model_type"]
-        temp_path = self._download_model_from_blob(model_name)
-        
-        try:
-            if model_type == "seq2seq":
-                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(temp_path)
-                
-                if self.use_gpu:
-                    self.models[model_name] = AutoModelForSeq2SeqLM.from_pretrained(
-                        temp_path,
-                        torch_dtype=torch.float32,  # I'm using FP32 but if it's too much load we can switch to torch.float16
-                        device_map="auto",
-                        low_cpu_mem_usage=False # we want to load all weights into memory so we set to False
-                    ) # we could set to True and delete after use but that would use memory & the models are large
-                else: # here, we're using CPU as a default but ideally we should not ever need to as it's more expensive & slower
-                    self.models[model_name] = AutoModelForSeq2SeqLM.from_pretrained( 
-                        temp_path,
-                        torch_dtype=torch.float32,
-                        low_cpu_mem_usage=False 
-                    )
+        model_path = model_config["path"]
 
-            elif model_type == "asr":
-                self.processors[model_name] = AutoProcessor.from_pretrained(temp_path)
-                
-                if self.use_gpu:
-                    self.models[model_name] = AutoModelForSpeechSeq2Seq.from_pretrained(
-                        temp_path,
-                        torch_dtype=torch.float32,
-                        device_map="auto",
-                        low_cpu_mem_usage=False
-                    )
-                else:
-                    self.models[model_name] = AutoModelForSpeechSeq2Seq.from_pretrained(
-                        temp_path,
-                        low_cpu_mem_usage=False
-                    )
-            
-            elif model_type == "text-to-speech":
-                from transformers import AutoModel
-                self.processors[model_name] = AutoProcessor.from_pretrained(temp_path)
-                self.models[model_name] = AutoModel.from_pretrained(
-                    temp_path,
-                    device_map="auto" if self.use_gpu else None
-                )
-            
-            shutil.rmtree(temp_path) # removing the temporary files from the ML models
-            return True
-            
-        except Exception as e:
-            raise RuntimeError(f"Failed to load model '{model_name}'.") from e
+        if not os.path.isdir(model_path):
+            raise RuntimeError(f"Model path does not exist: {model_path}")
+
+        if model_type == "seq2seq":
+            self.tokenizers[model_name] = AutoTokenizer.from_pretrained(model_path)
+            self.models[model_name] = AutoModelForSeq2SeqLM.from_pretrained(
+                model_path,
+                device_map="auto" if self.use_gpu else None,
+                torch_dtype=torch.float16 if self.use_gpu else torch.float32
+            )
+
+        elif model_type == "asr":
+            self.processors[model_name] = AutoProcessor.from_pretrained(model_path)
+            self.models[model_name] = AutoModelForSpeechSeq2Seq.from_pretrained(
+                model_path,
+                device_map="auto" if self.use_gpu else None,
+                torch_dtype=torch.float16 if self.use_gpu else torch.float32
+            )
+
+        elif model_type == "tts":
+            from transformers import AutoModel
+            self.processors[model_name] = AutoProcessor.from_pretrained(model_path)
+            self.models[model_name] = AutoModel.from_pretrained(
+                model_path,
+                device_map="auto" if self.use_gpu else None
+            )
+        print("Model loaded.")
+        return True
+
 
     def load_all_models(self):
         for model_name in self.config['models'].keys():
@@ -119,6 +66,33 @@ class ModelManager:
                 self.load_model(model_name)
             except Exception as e:
                 raise RuntimeError(f"Failed to load model '{model_name}'.") from e
+        print("All models loaded.")
+            
+    def unload_model(self, model_name):
+        if model_name in self.models:
+            del self.models[model_name]
+        if model_name in self.tokenizers:
+            del self.tokenizers[model_name]
+        if model_name in self.processors:
+            del self.processors[model_name]
+
+        if self.use_gpu:
+            torch.cuda.empty_cache()
+
+        print("Model unloaded.")
+
+        print(f"Model '{model_name}' unloaded.")
+
+    def unload_all_models(self):
+        self.models.clear()
+        self.tokenizers.clear()
+        self.processors.clear()
+
+        if self.use_gpu:
+            torch.cuda.empty_cache()
+
+        print("All models unloaded.")
+
     
     def get_model(self, model_name):
         return self.models.get(model_name)
