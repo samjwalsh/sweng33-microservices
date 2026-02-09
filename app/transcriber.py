@@ -19,7 +19,7 @@ class TranscriptionResult:
     model_name: str
 
 
-def format_timestamp(seconds: float) -> str:
+def format_timestamp(seconds: float) -> str: #Convert seconds to mm:ss.sss 
     minutes = int(seconds // 60)
     remaining_seconds = seconds - minutes * 60
     return f"{minutes:02d}:{remaining_seconds:06.3f}"
@@ -35,7 +35,7 @@ def write_transcript_txt(result: TranscriptionResult, output_path: str | Path) -
             f"[{format_timestamp(segment.start)} - {format_timestamp(segment.end)}] {segment.word}"
         )
 
-    # Trailing newline is common in text files
+
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path
 
@@ -45,12 +45,11 @@ def transcribe_with_timestamps(
     model_name: str = "openai/whisper-large-v3",
     timestamp_level: Literal["word", "chunk"] = "word",
     device: Optional[str] = None,
-    chunk_length_s: int = 30,
-    stride_length_s: int = 5,
+    chunk_length_s: int = 30,  # chunk long audio to improve stability
+    stride_length_s: int = 5, #overlap between chunks to avoid loss of recording 
 ) -> TranscriptionResult:
-    """
-    Transcribe a .wav file using Hugging Face Whisper and return text + timestamps.
-    """
+
+   
     wav_path = Path(wav_path)
 
     if not wav_path.exists():
