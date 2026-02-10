@@ -6,10 +6,6 @@ router = APIRouter()
 
 @router.get("/blob-health")
 def blob_health():
-    """
-    Check that models exist on Azure Blob Storage.
-    Returns a dictionary per model indicating whether blobs are accessible.
-    """
     connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
     if not connection_string:
         return {"status": "failed", "reason": "AZURE_STORAGE_CONNECTION_STRING not set"}
@@ -38,7 +34,3 @@ def blob_health():
             results[model_name] = {"accessible": False, "reason": str(e)}
 
     return results
-
-
-
-

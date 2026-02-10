@@ -37,7 +37,7 @@ class TestBlobHealth(unittest.TestCase):
                         blobs,
                         msg=f"No blobs found for model '{model_name}' with prefix '{cfg['blob_prefix']}'"
                     )
-                    print(f"{model_name}: ✅ Accessible, {len(blobs)} files found")
+                    print(f"{model_name}: Accessible, {len(blobs)} files found")
                 except Exception as e:
                     self.fail(f"Failed to access container for model '{model_name}': {e}")
 
