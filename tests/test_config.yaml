@@ -1,5 +1,0 @@
-models:
-  translation:
-    model_type: seq2seq
-    container_name: dummy-container
-    blob_prefix: dummy/
