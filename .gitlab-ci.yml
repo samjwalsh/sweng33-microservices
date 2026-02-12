@@ -1,48 +1,31 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
-  - test
-
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHONPATH: "." 
-
-cache:
-  key: "$CI_COMMIT_REF_SLUG"
-  paths:
-    - .cache/pip
-    - .venv/
-
-test:
+- build
+- test
+- deploy
+- review
+- dast
+- staging
+- canary
+- production
+- incremental rollout 10%
+- incremental rollout 25%
+- incremental rollout 50%
+- incremental rollout 100%
+- performance
+- cleanup
+- secret-detection
+sast:
   stage: test
-  image: python:3.11-slim
-  tags:        
-    - docker
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends ffmpeg git
-    
-    - python -m venv .venv
-    - source .venv/bin/activate
-    - touch coverage.xml report.xml
-    - pip install --upgrade pip
-    - pip install pytest pytest-cov
-    - pip install -r requirements.txt
-
-  script:
-    - source .venv/bin/activate
-        - pytest tests/ -v \
-        --cov=app \
-        --cov-report=term-missing \
-        --cov-report=xml:coverage.xml \
-        --junitxml=report.xml || true
-    - ls -la coverage.xml report.xml || true
-
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-  
-  artifacts:
-    when: always
-    paths:
-      - coverage.xml
-      - report.xml
-    expire_in: 30 days
-
-  rules:
-    - when: always
+include:
+- template: Auto-DevOps.gitlab-ci.yml
+variables:
+  SECRET_DETECTION_ENABLED: 'true'
+secret_detection:
+  stage: secret-detection
