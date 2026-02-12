@@ -39,5 +39,8 @@ def translate_text(source_language, target_language, text):
         print(f"Error Code: {exception.error.code}")
         print(f"Message: {exception.error.message}")
 
+"""
+# sample usage
 translated = translate_text("en", "es", "Hello")
 print(translated)
+"""
