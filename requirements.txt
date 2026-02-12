@@ -6,3 +6,5 @@ transformers
 pytest
 pytest-cov
 pyyaml
+
+azure-ai-translation-text==1.0.0b1
