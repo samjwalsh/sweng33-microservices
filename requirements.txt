@@ -1,0 +1,16 @@
+huggingface_hub[cli]
+accelerate
+transformers
+torch
+
+ffmpeg-python
+flask
+azure-storage-blob
+
+pytest
+pytest-cov
+PyYAML
+python-dotenv
+
+azure-storage-blob>=12.17.0
+fastapi 
