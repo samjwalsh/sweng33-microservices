@@ -6,3 +6,6 @@ soundfile
 pytest
 pytest-cov
 pyyaml
+azure-storage-blob
+fastapi
+uvicorn
