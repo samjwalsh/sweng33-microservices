@@ -28,7 +28,11 @@ test:
 
   script:
     - source .venv/bin/activate
-    - pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
+    - pytest tests/ -v \
+      --cov=app \
+      --cov-report=term-missing \
+      --cov-report=xml:$CI_PROJECT_DIR/coverage.xml \
+      --junitxml=$CI_PROJECT_DIR/report.xml
 
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   
