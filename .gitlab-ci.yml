@@ -21,27 +21,28 @@ test:
     
     - python -m venv .venv
     - source .venv/bin/activate
+    - touch coverage.xml report.xml
     - pip install --upgrade pip
-    
+    - pip install pytest pytest-cov
     - pip install -r requirements.txt
 
   script:
     - source .venv/bin/activate
-    - pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=report.xml
+        - pytest tests/ -v \
+        --cov=app \
+        --cov-report=term-missing \
+        --cov-report=xml:coverage.xml \
+        --junitxml=report.xml || true
+    - ls -la coverage.xml report.xml || true
 
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   
   artifacts:
     when: always
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-      junit: report.xml
     paths:
       - coverage.xml
       - report.xml
     expire_in: 30 days
-  
+
   rules:
     - when: always

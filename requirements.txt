@@ -1,8 +1,16 @@
 huggingface_hub[cli]
-ffmpeg-python
-torch --index-url https://download.pytorch.org/whl/cpu
+accelerate
 transformers
+torch
+
+ffmpeg-python
+flask
+azure-storage-blob
 
 pytest
 pytest-cov
-pyyaml
+PyYAML
+python-dotenv
+
+azure-storage-blob>=12.17.0
+fastapi 
