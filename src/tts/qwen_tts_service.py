@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import TYPE_CHECKING, Any, Iterable, Optional
 
 import soundfile as sf
 import torch
-from qwen_tts import Qwen3TTSModel
+
+if TYPE_CHECKING:
+    from qwen_tts import Qwen3TTSModel
 
 
 @dataclass(frozen=True)
@@ -41,7 +43,7 @@ class QwenTTSService:
         # Allow explicit override for tests / deployment
         self.device_map, self.dtype = self._pick_device_and_dtype(device_map, dtype)
 
-        self._model = None  # lazy load
+        self._model: Any = None  # lazy load
 
     def _pick_device_and_dtype(self, device_map: Optional[str], dtype: Optional[torch.dtype]):
         if device_map is not None and dtype is not None:
@@ -54,6 +56,9 @@ class QwenTTSService:
 
     def _load_model(self):
         if self._model is None:
+            # Import here so unit tests can collect without loading qwen runtime deps.
+            from qwen_tts import Qwen3TTSModel
+
             self._model = Qwen3TTSModel.from_pretrained(
                 self.model_id,
                 device_map=self.device_map,
