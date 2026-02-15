@@ -16,8 +16,26 @@ print("CREDENTIAL_SET:", bool(cred), "LEN:", len(cred) if cred else 0)
 
 
 def build_client() -> BlobServiceClient:
-    account_url = os.getenv("AZURE_STORAGE_ACCOUNT")
-    credential = os.getenv("AZURE_STORAGE_KEY")
+    # Prefer a connection string if provided (common and simple)
+    connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+    if connection_string:
+        return BlobServiceClient.from_connection_string(connection_string)
+
+    # Support a couple of common env var names for account URL + key
+    account_url = os.getenv("AZURE_STORAGE_ACCOUNT") or os.getenv("AZURE_STORAGE_ACCOUNT_URL")
+    credential = os.getenv("AZURE_STORAGE_KEY") or os.getenv("AZURE_STORAGE_CREDENTIAL")
+
+    # If the provided account value looks like just an account name (no scheme, no dots),
+    # construct the full blob service URL. If it lacks a scheme but contains a hostname,
+    # add https://.
+    if account_url:
+        raw = account_url.strip()
+        if not raw.startswith(("http://", "https://")):
+            # account name like 'sweng33' -> https://sweng33.blob.core.windows.net
+            if "." not in raw:
+                account_url = f"https://{raw}.blob.core.windows.net"
+            else:
+                account_url = f"https://{raw}"
 
     if account_url and credential:
         return BlobServiceClient(account_url=account_url, credential=credential)
@@ -26,7 +44,7 @@ def build_client() -> BlobServiceClient:
         "Missing auth config. Set either:\n"
         "1) AZURE_STORAGE_CONNECTION_STRING\n"
         "or\n"
-        "2) AZURE_STORAGE_ACCOUNT_URL + AZURE_STORAGE_CREDENTIAL"
+        "2) AZURE_STORAGE_ACCOUNT (full account URL, e.g. https://<account>.blob.core.windows.net) + AZURE_STORAGE_KEY"
     )
 
 
