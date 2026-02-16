@@ -10,12 +10,10 @@ azure-storage-blob
 pytest
 pytest-cov
 
-azure-ai-translation-text==1.0.0b1
 PyYAML
 python-dotenv
 
-azure-storage-blob>=12.17.0
-
 soundfile
 azure-ai-translation-text
+azure-ai-transcription
 
