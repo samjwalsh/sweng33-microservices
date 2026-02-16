@@ -52,4 +52,4 @@ htmlcov/
 *.log
 
 src/ml_models/test.py
-data/english_audio.wav
+data/*
