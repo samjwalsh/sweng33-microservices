@@ -6,7 +6,7 @@ import pytest
 from src.utils import extract_audio, merge_audio
 
 
-@patch("app.utils.subprocess.run")
+@patch("src.utils.subprocess.run")
 def test_extract_audio_invokes_ffmpeg_with_expected_flags(mock_run, tmp_path: Path):
     input_mp4 = tmp_path / "input.mp4"
     output_wav = tmp_path / "output.wav"
@@ -24,7 +24,7 @@ def test_extract_audio_invokes_ffmpeg_with_expected_flags(mock_run, tmp_path: Pa
     assert str(output_wav) in cmd
 
 
-@patch("app.utils.subprocess.run")
+@patch("src.utils.subprocess.run")
 def test_merge_audio_invokes_ffmpeg_with_expected_flags(mock_run, tmp_path: Path):
     input_mp4 = tmp_path / "input.mp4"
     input_wav = tmp_path / "input.wav"

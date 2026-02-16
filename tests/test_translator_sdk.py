@@ -9,7 +9,7 @@ def test_translate_text_success():
     mock_item.translations = [mock_translation]
     mock_response = [mock_item]
 
-    with patch("app.translator_sdk.TextTranslationClient") as MockClient:
+    with patch("src.translator_sdk.TextTranslationClient") as MockClient:
         instance = MockClient.return_value
         instance.translate.return_value = mock_response
 
@@ -19,7 +19,7 @@ def test_translate_text_success():
         instance.translate.assert_called_once()
 
 def test_translate_text_empty_response():
-    with patch("app.translator_sdk.TextTranslationClient") as MockClient:
+    with patch("src.translator_sdk.TextTranslationClient") as MockClient:
         instance = MockClient.return_value
         instance.translate.return_value = None
 
@@ -27,7 +27,7 @@ def test_translate_text_empty_response():
         assert result is None
 
 def test_translate_text_handles_http_error():
-    with patch("app.translator_sdk.TextTranslationClient") as MockClient:
+    with patch("src.translator_sdk.TextTranslationClient") as MockClient:
         instance = MockClient.return_value
         
         mock_response = MagicMock()
