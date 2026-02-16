@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from src.tts.qwen_tts_service import QwenTTSService, TTSSegment
+from src.ml_models.qwen_tts_service import QwenTTSService, TTSSegment
 from src.storage.blob_upload import AzureBlobStorage
 
 

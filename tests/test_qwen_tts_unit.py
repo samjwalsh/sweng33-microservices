@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.ml_models.qwen_tts_service import QwenTTSService, TTSSegment
+from src.ml_models.tts import QwenTTSService, TTSSegment
 
 
 class DummyModel:
