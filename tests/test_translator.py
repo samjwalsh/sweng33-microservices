@@ -1,2 +1,2 @@
-def test_placeholder():
+def test_translator():
     assert True

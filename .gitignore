@@ -1,16 +1,52 @@
+.env
+*.env
+!.env.example
 
-# Qwen3-TTS Proof Of Concept
-research/qwen3_tts_poc/outputs/
-research/qwen3_tts_poc/samples/*.wav
+models/
+local_models/
 
-# Python / env
-.venv/
 __pycache__/
-*.pt
-*.bin
-*.safetensors
-.cache/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# macOS junk
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
 .DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
 
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+*.log
