@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 
-from app.transcriber import (
+from src.ml_models.transcriber import (
     format_timestamp,
     write_transcript_txt,
     transcribe_with_timestamps,

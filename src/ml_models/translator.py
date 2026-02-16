@@ -3,6 +3,9 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
 from config.model_config import TRANSLATION_MODELS, LANGUAGE_CODES
 
+"""
+This is a local version of translator_sdk, to be used if hosting the models on azure 
+"""
 def load_translator(model_name):
     hf_token = os.getenv("HF_TOKEN")
     
