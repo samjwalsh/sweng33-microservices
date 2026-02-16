@@ -11,9 +11,9 @@ from azure.ai.translation.text.models import InputTextItem
 from azure.core.exceptions import HttpResponseError
 
 load_dotenv()
-key = os.getenv("AZURE_FOUNDRY_KEY")
-endpoint = os.getenv("AZURE_FOUNDRY_ENDPOINT")
-region = os.getenv("AZURE_FOUNDRY_REGION")
+key = os.getenv("TRANSLATOR_KEY")
+endpoint = os.getenv("TRANSLATOR_ENDPOINT")
+region = os.getenv("TRANSLATOR_REGION")
 
 def translate_text(source_language, target_language, text):
     credential = TranslatorCredential(key, region)
@@ -39,7 +39,8 @@ def translate_text(source_language, target_language, text):
         print(f"Error Code: {exception.error.code}")
         print(f"Message: {exception.error.message}")
 
-
+"""
 # sample usage
 translated = translate_text("en", "es", "Hello")
 print(translated)
+"""
