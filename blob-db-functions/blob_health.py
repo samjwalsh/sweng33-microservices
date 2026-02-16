@@ -1,4 +1,6 @@
 import os
+import uuid
+from pathlib import Path
 from dotenv import load_dotenv
 from azure.storage.blob import BlobServiceClient
 
@@ -22,6 +24,22 @@ def download_video(blob_location: str) -> bytes:
     return blob_client.download_blob().readall()
 
 
+#Write a function to upload a video file to blob storage. Steps:
+    #Connect to the blob storage and upload the file, make sure to give it a unique name to avoid conflicting file names.
+    #Return the location of the file (strip the url, so only return the folder (if any) and filename)
+def upload_video(video_bytes: bytes, original_filename: str, folder: str) -> str:
+    
+    #makes a unqiue filename
+    ext = Path(original_filename).suffix or ".mp4"
+    unique_filename = f"{uuid.uuid4().hex}{ext}"
+
+    #builds blob locations and uploads video
+    blob_location = f"{folder}/{unique_filename}" if folder else unique_filename
+    blob_client = service.get_blob_client(container=container_name, blob=blob_location)
+    blob_client.upload_blob(video_bytes, overwrite=False)
+
+    return blob_location
+
 
 if __name__ == "__main__":
 
@@ -38,6 +56,12 @@ if __name__ == "__main__":
     data = blob.download_blob().readall()
     print("Blob connected. Read back:", data.decode("utf-8"))
 
+
+
     #Test to see if download_video() works
     data = download_video("j0mWWjjpuhRt5cWCjyidL0m5itR99RvB/1ce509ee-ceb7-43e8-bcd3-60a8ab685655.mp4")
     print("Downloaded bytes:", len(data))
+
+    #Test to see if upload_video() works
+    loc = upload_video(b"globe_test_file", "test_file_small.mp4", folder="queued")
+    print("Uploaded to:", loc)
