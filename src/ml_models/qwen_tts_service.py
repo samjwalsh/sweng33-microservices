@@ -2,14 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, Optional
+from typing import Any, Iterable, Optional
 
 import soundfile as sf
 import torch
-
-if TYPE_CHECKING:
-    from qwen_tts import Qwen3TTSModel
-
 
 @dataclass(frozen=True)
 class TTSSegment:

@@ -1,8 +1,7 @@
-from pathlib import Path
 import numpy as np
 import pytest
 
-from src.tts.qwen_tts_service import QwenTTSService, TTSSegment
+from src.ml_models.qwen_tts_service import QwenTTSService, TTSSegment
 
 
 class DummyModel:
