@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from src.tts.qwen_tts_service import QwenTTSService, TTSSegment
-from src.storage.azure_blob import AzureBlobStorage
+from src.storage.blob_upload import AzureBlobStorage
 
 
 def generate_wav_and_upload(

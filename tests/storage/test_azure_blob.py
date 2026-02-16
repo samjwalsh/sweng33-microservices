@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 import os
 
-from src.storage.azure_blob import AzureBlobStorage
+from src.storage.blob_upload import AzureBlobStorage
 
 
 def test_upload_file_calls_upload_blob(tmp_path):
