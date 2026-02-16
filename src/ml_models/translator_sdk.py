@@ -6,10 +6,9 @@ After the MVP presentation, we can host the models on GPU and use a hugging face
 import os
 from dotenv import load_dotenv
 
-from azure.ai.translation.text import TextTranslationClient
+from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
 from azure.ai.translation.text.models import InputTextItem
 from azure.core.exceptions import HttpResponseError
-from azure.core.credentials import AzureKeyCredential 
 
 load_dotenv()
 key = os.getenv("AZURE_FOUNDRY_KEY")
@@ -17,7 +16,7 @@ endpoint = os.getenv("AZURE_FOUNDRY_ENDPOINT")
 region = os.getenv("AZURE_FOUNDRY_REGION")
 
 def translate_text(source_language, target_language, text):
-    credential = AzureKeyCredential(key) 
+    credential = TranslatorCredential(key, region)
     text_translator = TextTranslationClient(endpoint=endpoint, credential=credential)
     input_text_element = [InputTextItem(text=text)]
     target_language = [target_language] # azure uses a list of translated languages but this is overcomplicated so I just changed the input to a list
@@ -40,8 +39,7 @@ def translate_text(source_language, target_language, text):
         print(f"Error Code: {exception.error.code}")
         print(f"Message: {exception.error.message}")
 
-"""
+
 # sample usage
 translated = translate_text("en", "es", "Hello")
 print(translated)
-"""
