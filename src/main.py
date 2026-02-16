@@ -1,8 +1,7 @@
 from ml_models.transcriber_sdk import transcribe_audio
 from ml_models.translator_sdk import translate_text
-from utils import extract_audio
+from utils import extract_audio, merge_audio
 from ml_models.tts import TTS, TTSSegment 
-import os
 
 print("Extracting audio")
 extract_audio("data/english_video_tiny.mp4","data/english_audio_tiny.wav")
@@ -26,3 +25,5 @@ output_path = tts_service.synthesize(
 )
 
 print(f"Audio generated at: {output_path}")
+
+merge_audio("data/english_video_tiny.mp4", "data/spanish_audio_tiny.wav", "data/spanish_video_tiny.mp4")
