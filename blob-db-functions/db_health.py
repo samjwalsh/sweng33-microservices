@@ -8,16 +8,9 @@ load_dotenv()
 
 
 
-
-
-#Function to retrieve the locations of the oldest 'queued' job
-    #Check if there are any rows in the database whose status is 'queued'.
-    #If there is, select the oldest one (you can use the 'created_at' property).
-    #Update that entry so that the status is set to 'processing'.
-    #Return the location of this file (the 'blob' attribute from the database), as well as the id of the entry (we will need this later)
-
-
 def retrieve_oldest_queued_job():
+    """Returns the id and blob location of the oldest queued job, and sets its status to processing"""
+    
     db_url = os.environ["DATABASE_URL"]
 
     with psycopg.connect(db_url) as conn:
@@ -50,13 +43,11 @@ def retrieve_oldest_queued_job():
 
    
 
-#Update status in database
-    #Connect to the db.
-    #Find the entry by it's id.
-    # Update the status of the entry to 'done'
-    #Update the value of 'completed_blob' to the location of the new video file.
 
 def update_job_status(job_id: int, completed_blob_location: str):
+    """Updates the status of a job to done and sets the completed_blob field to the location of the new video file"""
+    
+    
     db_url = os.environ["DATABASE_URL"]
 
     with psycopg.connect(db_url) as conn:
