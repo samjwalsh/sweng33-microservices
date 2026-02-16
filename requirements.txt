@@ -15,3 +15,7 @@ PyYAML
 python-dotenv
 
 azure-storage-blob>=12.17.0
+
+soundfile
+azure-ai-translation-text
+
