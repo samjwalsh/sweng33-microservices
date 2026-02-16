@@ -1,6 +1,6 @@
 import os
 import pytest
-from app.blob_health import BlobHealthCheck
+from src.blob_health import BlobHealthCheck
 from dotenv import load_dotenv
 
 load_dotenv()

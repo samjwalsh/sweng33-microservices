@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-from app.translator_sdk import translate_text
+from src.translator_sdk import translate_text
 from azure.core.exceptions import HttpResponseError
 
 def test_translate_text_success():

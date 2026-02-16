@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.utils import extract_audio, merge_audio
+from src.utils import extract_audio, merge_audio
 
 
 @patch("app.utils.subprocess.run")
