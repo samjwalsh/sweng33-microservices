@@ -52,3 +52,4 @@ htmlcov/
 *.log
 
 src/ml_models/test.py
+data/*

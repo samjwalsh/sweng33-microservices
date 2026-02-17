@@ -62,5 +62,3 @@ def merge_audio(input_mp4: str | Path, input_wav: str | Path, output_mp4: str | 
         check=True,
         text=False,
     )
-
-

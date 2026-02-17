@@ -16,4 +16,4 @@ python-dotenv
 soundfile
 azure-ai-translation-text
 azure-ai-transcription
-
+qwen-tts
