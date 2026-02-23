@@ -1,31 +1,75 @@
-from audiostretchy.stretch import stretch_audio
+import json
+import subprocess
 from pathlib import Path
-import wave
+from typing import Optional, Union
 
 
-def stretch_audio_to_time(input_file: str, target_duration: float, output_file: str | None = None) -> str:
-    if target_duration <= 0:
-        raise ValueError("target_duration must be > 0 seconds")
-    
-    original_duration = wav_duration_seconds(input_file)
-    if original_duration <= 0:
-        raise ValueError(f"Could not determine duration for {input_file}")
+class AudioStretch:
+    @staticmethod
+    def stretch_audio_to_time(
+        input: Union[str, Path],
+        target_seconds: float,
+        output: Optional[Union[str, Path]] = None,
+    ) -> str:
+        
+        input_path = Path(input)
 
+        if target_seconds <= 0:
+            raise ValueError("target_seconds must be > 0")
 
-    input_path = Path(input_file)
+        if output is None:
+            output_path = input_path.with_name(
+                f"{input_path.stem}_stretched_{target_seconds:.2f}s{input_path.suffix}"
+            )
+        else:
+            output_path = Path(output)
 
-    if output_file is None:
-        output_path = input_path.with_name(f"{input_path.stem}_stretched_{target_duration:.2f}s{input_path.suffix}")
-    else:
-        output_path = Path(output_file)
+        orig = AudioStretch.ffprobe_duration(input_path)
+        if orig <= 0:
+            raise ValueError(f"Could not determine duration for: {input_path}")
 
-    stretch_factor =  target_duration / original_duration
-    stretch_audio(str(input_path), str(output_path), ratio=stretch_factor)
+        time_ratio = target_seconds / orig
 
-    return str(output_path)
+        try:
+            subprocess.run(
+                [
+                    "rubberband",
+                    "-t",
+                    f"{time_ratio:.8f}",
+                    str(input_path),
+                    str(output_path),
+                ],
+                check=True,
+            )
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                "Could not find `rubberband` on PATH"
+            ) from e
 
+        return str(output_path)
 
+    @staticmethod
+    def ffprobe_duration(path: Union[str, Path]) -> float:
+        
+        try:
+            p = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "json",
+                    str(path),
+                ],
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            )
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                "Could not find `ffprobe` on PATH"
+            ) from e
 
-def wav_duration_seconds(input_file: str) -> float:
-    with wave.open(input_file, "rb") as wf:
-        return wf.getnframes() / float(wf.getframerate())
+        return float(json.loads(p.stdout)["format"]["duration"])
