@@ -8,7 +8,7 @@ from kafka import KafkaProducer
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Publish test events to Kafka.")
-    parser.add_argument("--bootstrap-server", default="kafka.samjw.xyz:9092", help="Kafka bootstrap server")
+    parser.add_argument("--bootstrap-server", help="Kafka bootstrap server")
     parser.add_argument("--topic", default="test", help="Kafka topic")
     parser.add_argument("--count", type=int, default=1, help="Number of events to publish")
     parser.add_argument("--delay", type=float, default=0.0, help="Delay between sends in seconds")

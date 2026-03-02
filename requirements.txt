@@ -18,3 +18,4 @@ azure-ai-translation-text
 azure-ai-transcription
 qwen-tts
 kafka-python
+psycopg[binary]

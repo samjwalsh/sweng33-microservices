@@ -26,7 +26,7 @@ def safe_deserialize(value: bytes) -> Any:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Consume test events from Kafka.")
-    parser.add_argument("--bootstrap-server", default="kafka.samjw.xyz:9092", help="Kafka bootstrap server")
+    parser.add_argument("--bootstrap-server", help="Kafka bootstrap server")
     parser.add_argument("--topic", default="test", help="Kafka topic")
     parser.add_argument(
         "--group-id",

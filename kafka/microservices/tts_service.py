@@ -1,0 +1,143 @@
+import argparse
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+CURRENT_DIR = Path(__file__).resolve().parent
+KAFKA_DIR = CURRENT_DIR.parent
+if str(KAFKA_DIR) not in sys.path:
+    sys.path.insert(0, str(KAFKA_DIR))
+
+from db_helper import are_all_segments_generated, set_tts_generated_blob
+from microservice_template import KafkaMicroservice, MessageContext
+from payload_validation import PayloadValidationError, validate_tts_payload
+from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
+
+
+def select_voice_clone_training_segments(
+    segments: list[dict[str, Any]],
+    max_training_segments: int = 5,
+) -> list[dict[str, Any]]:
+    candidates = [segment for segment in segments if str(segment.get("text", "")).strip()]
+    ranked = sorted(
+        candidates or segments,
+        key=lambda segment: float(segment["end"]) - float(segment["start"]),
+        reverse=True,
+    )
+    return ranked[:max_training_segments]
+
+
+def prepare_voice_clone_training_data(
+    *,
+    src_blob: str,
+    speaker_id: str,
+    training_segments: list[dict[str, Any]],
+) -> list[str]:
+    raise NotImplementedError(
+        "Implement extraction of source-audio clips for the selected training segments. "
+        "Return a list of paths or blob references pointing to audio samples for voice cloning."
+    )
+
+
+def clone_voice_once(
+    *,
+    src_blob: str,
+    speaker_id: str,
+    training_audio_refs: list[str],
+) -> str:
+    raise NotImplementedError(
+        "Implement voice cloning here. "
+        "Use training_audio_refs to create/retrieve one cloned voice profile for this speaker, "
+        "then return its voice_profile_id."
+    )
+
+
+def synthesize_segment_audio(
+    *,
+    src_blob: str,
+    speaker_id: str,
+    segment_id: int,
+    text: str,
+    voice_profile_id: str,
+) -> str:
+    raise NotImplementedError(
+        "Implement segment synthesis here. "
+        "Use voice_profile_id to generate audio for this segment and return the generated blob/path reference."
+    )
+
+
+def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicroservice) -> None:
+    try:
+        validate_tts_payload(payload)
+    except PayloadValidationError as error:
+        print(f"[{service.service_name}] Invalid payload at offset={context.offset}: {error}")
+        return
+
+    src_blob = payload["src_blob"]
+    speaker_id = payload["speaker_id"]
+    segments = payload["segments"]
+
+    training_segments = select_voice_clone_training_segments(segments)
+
+    training_audio_refs = prepare_voice_clone_training_data(
+        src_blob=src_blob,
+        speaker_id=speaker_id,
+        training_segments=training_segments,
+    )
+
+    voice_profile_id = clone_voice_once(
+        src_blob=src_blob,
+        speaker_id=speaker_id,
+        training_audio_refs=training_audio_refs,
+    )
+
+    for segment in segments:
+        gen_blob = synthesize_segment_audio(
+            src_blob=src_blob,
+            speaker_id=speaker_id,
+            segment_id=segment["segment_id"],
+            text=segment["text"],
+            voice_profile_id=voice_profile_id,
+        )
+        set_tts_generated_blob(
+            src_blob=src_blob,
+            segment_id=segment["segment_id"],
+            gen_blob=gen_blob,
+        )
+
+    if are_all_segments_generated(src_blob):
+        service.publish(
+            topic=TOPIC_RECONSTRUCT_VIDEO,
+            key=key_by_src_blob(src_blob),
+            value={"src_blob": src_blob},
+        )
+
+    print(
+        f"[{service.service_name}] Processed speaker={speaker_id} "
+        f"segments={len(segments)} src_blob={src_blob}"
+    )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Text-to-speech worker")
+    parser.add_argument("--group-id", default=f"tts-{int(time.time())}")
+    parser.add_argument("--bootstrap-server", default=None)
+    parser.add_argument("--from-beginning", action="store_true")
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    service = KafkaMicroservice(
+        service_name="tts-service",
+        input_topic=TOPIC_TEXT_TO_SPEECH,
+        group_id=args.group_id,
+        bootstrap_server=args.bootstrap_server,
+        from_beginning=args.from_beginning,
+    )
+    service.run(handler)
+
+
+if __name__ == "__main__":
+    main()
