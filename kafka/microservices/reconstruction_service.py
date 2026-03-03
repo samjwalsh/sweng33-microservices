@@ -14,6 +14,15 @@ from payload_validation import PayloadValidationError, validate_reconstruct_payl
 from topics import TOPIC_RECONSTRUCT_VIDEO
 
 
+def fit_segment_audio_to_timing(*, segment: TTSSegment, input_audio_path: str, output_audio_path: str) -> str:
+    raise NotImplementedError(
+        "Implement time alignment for one segment in this function. "
+        "Input: TTSSegment (start, end) and source generated audio path. "
+        "Required behavior: stretch/compress the segment audio so its duration matches (end - start), "
+        "then write the adjusted audio to output_audio_path and return that path."
+    )
+
+
 def reconstruct_video(*, src_blob: str, segments: list[TTSSegment]) -> str:
     raise NotImplementedError(
         "Implement reconstruction end-to-end in this function. "
