@@ -1,6 +1,8 @@
 import argparse
 import sys
 import time
+import subprocess
+import json
 from pathlib import Path
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -12,15 +14,75 @@ from db_helper import TTSSegment, get_segments_for_src_blob
 from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_reconstruct_payload
 from topics import TOPIC_RECONSTRUCT_VIDEO
+from typing import Union
 
 
 def fit_segment_audio_to_timing(*, segment: TTSSegment, input_audio_path: str, output_audio_path: str) -> str:
-    raise NotImplementedError(
-        "Implement time alignment for one segment in this function. "
-        "Input: TTSSegment (start, end) and source generated audio path. "
-        "Required behavior: stretch/compress the segment audio so its duration matches (end - start), "
-        "then write the adjusted audio to output_audio_path and return that path."
-    )
+    "Given a TTSSegment with start/end timing and an input audio file, stretch or compress the audio to fit the target duration. "
+
+    if segment.end <= segment.start:
+        raise ValueError(f"Invalid segment timing: start={segment.start} end={segment.end}")
+    
+    target_duration = segment.end - segment.start
+
+    if target_duration < 0:
+        raise ValueError(f"Invalid segment timing: start={segment.start} end={segment.end}")
+    
+    elif target_duration == 0:
+        "Segment has zero duration, skipping audio generation."
+
+    else:
+        orig = get_audio_duration(input_audio_path)
+        if orig <= 0:
+            raise ValueError(f"Could not determine duration for: {input_audio_path}")
+        time_ratio = target_duration / orig
+
+        try:
+            subprocess.run(
+                [
+                    "rubberband",
+                    "-t",
+                    f"{time_ratio:.8f}",
+                    str(input_audio_path),
+                    str(output_audio_path),
+                ],
+                check=True,
+            )
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                "Could not find `rubberband` on PATH"
+            ) from e
+
+        return str(output_audio_path)
+
+    
+
+
+def get_audio_duration(path: Union[str, Path]) -> float:
+    "Use ffprobe to get the duration of an audio file in seconds. "
+        
+    try:
+        p = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(path),
+            ],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        )
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            "Could not find `ffprobe` on PATH"
+        ) from e
+
+    return float(json.loads(p.stdout)["format"]["duration"])
 
 
 def reconstruct_video(*, src_blob: str, segments: list[TTSSegment]) -> str:
