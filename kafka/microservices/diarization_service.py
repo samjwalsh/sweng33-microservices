@@ -13,6 +13,11 @@ from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_ingest_payload
 from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
 
+from tempfile import TemporaryDirectory
+from pathlib import Path
+from blob_helper import download_blob_to_file
+from src.ml_models.diarization import diarize
+
 
 def detect_source_language(src_blob: str) -> str:
     raise NotImplementedError(
@@ -22,11 +27,29 @@ def detect_source_language(src_blob: str) -> str:
 
 
 def diarize_and_transcribe(src_blob: str, src_lang: str) -> list[dict[str, Any]]:
-    raise NotImplementedError(
-        "Implement diarization/transcription here using your team's tooling. "
-        "Return a list of segments shaped as: "
-        "{'segment_id': int, 'speaker_id': str, 'start': float, 'end': float, 'text': str}."
-    )
+    with TemporaryDirectory() as tmpdir:
+        local_wav = Path(tmpdir) / "input.wav"
+
+        download_blob_to_file(
+            blob_location=src_blob,
+            output_path=local_wav,
+        )
+
+        diarization_segments = diarize(str(local_wav))
+
+        segments: list[dict[str, Any]] = []
+        for idx, seg in enumerate(diarization_segments):
+            segments.append(
+                {
+                    "segment_id": idx,
+                    "speaker_id": seg["speaker"],
+                    "start": seg["start"],
+                    "end": seg["end"],
+                    "text": "",
+                }
+            )
+
+        return segments
 
 
 def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicroservice) -> None:
