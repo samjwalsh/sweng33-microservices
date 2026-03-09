@@ -4,6 +4,8 @@ import time
 import subprocess
 import json
 from pathlib import Path
+import tempfile
+from audio_utils import AudioStretch
 
 CURRENT_DIR = Path(__file__).resolve().parent
 KAFKA_DIR = CURRENT_DIR.parent
@@ -11,11 +13,12 @@ if str(KAFKA_DIR) not in sys.path:
     sys.path.insert(0, str(KAFKA_DIR))
 
 from db_helper import TTSSegment, get_segments_for_src_blob
+from audio_utils import merge_audio, extract_audio, stitch_audio_with_timestamps, prepare_segment
 from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_reconstruct_payload
 from topics import TOPIC_RECONSTRUCT_VIDEO
 from typing import Union
-
+from blob_helper import upload_file, download_blob_to_file, build_reconstruction_blob_name
 
 def fit_segment_audio_to_timing(*, segment: TTSSegment, input_audio_path: str, output_audio_path: str) -> str:
     "Given a TTSSegment with start/end timing and an input audio file, stretch or compress the audio to fit the target duration. "
@@ -56,8 +59,6 @@ def fit_segment_audio_to_timing(*, segment: TTSSegment, input_audio_path: str, o
         return str(output_audio_path)
 
     
-
-
 def get_audio_duration(path: Union[str, Path]) -> float:
     "Use ffprobe to get the duration of an audio file in seconds. "
         
@@ -86,14 +87,39 @@ def get_audio_duration(path: Union[str, Path]) -> float:
 
 
 def reconstruct_video(*, src_blob: str, segments: list[TTSSegment]) -> str:
-    raise NotImplementedError(
-        "Implement reconstruction end-to-end in this function. "
-        "Available input: src_blob plus ordered TTSSegment rows (segment_id, speaker_id, start, end, gen_blob). "
-        "Required behavior: build the final dubbed output using all generated segment audio, align to timing, compress or stretch audio tracks if necessary"
-        "create the new video file, upload to blob storage and return the storage url."
-    )
+    """
+    Implement reconstruction end-to-end in this function. 
+    Available input: src_blob plus ordered TTSSegment rows (segment_id, speaker_id, start, end, gen_blob). 
+    Required behavior: build the final dubbed output using all generated segment audio, align to timing, compress or stretch audio tracks if necessary
+    create the new video file, upload to blob storage and return the storage url.
+    """
 
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = Path(tmp_dir)
+        original_video = download_blob_to_file(blob_location=src_blob, output_path=tmp_dir / "original.mp4")
+        wav_dir = tmp_dir / "wavs"
+        wav_dir.mkdir()
+        segments_info = []
 
+        for seg in sorted(segments, key=lambda s: s.start):
+            raw_path = wav_dir / f"raw_{seg.segment_id}.wav"
+            prepared_path = wav_dir / f"segment_{seg.segment_id}.wav"
+            download_blob_to_file(blob_location=seg.gen_blob,output_path=raw_path)
+            prepare_segment(raw_path,seg.start,seg.end,prepared_path) # assuming seg.start & seg.end is pre-translation timestamps & .wav is the translated .wav file
+            segments_info.append({
+                "path":prepared_path,
+                "start":seg.start,
+                "end":seg.end
+            })
+
+        stitched_wav = tmp_dir / "stitched.wav"
+        stitch_audio_with_timestamps(segments_info, stitched_wav)
+        output_mp4 = tmp_dir / "output.mp4"
+        merge_audio(input_wav=stitched_wav,input_mp4=original_video,output_mp4=output_mp4)
+        upload_name = build_reconstruction_blob_name(src_blob=src_blob, ext=".mp4")
+        upload_file(local_path=output_mp4,blob_name=upload_name)
+        return upload_name
+        
 def handler(payload: dict, context: MessageContext, service: KafkaMicroservice) -> None:
     try:
         validate_reconstruct_payload(payload)
