@@ -1,9 +1,15 @@
 import argparse
 import sys
 import time
+
+import os
+import logging
+from dotenv import load_dotenv
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
+from azure.ai.translation.text.models import InputTextItem
 
 CURRENT_DIR = Path(__file__).resolve().parent
 KAFKA_DIR = CURRENT_DIR.parent
@@ -15,11 +21,64 @@ from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_translate_payload
 from topics import TOPIC_TEXT_TO_SPEECH, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob_and_speaker
 
+logger = logging.getLogger(__name__)
+load_dotenv() 
+
+TRANSLATOR_KEY = os.getenv("TRANSLATOR_KEY")         
+TRANSLATOR_ENDPOINT = os.getenv("TRANSLATOR_ENDPOINT") 
+TRANSLATOR_REGION = os.getenv("TRANSLATOR_REGION")    
+
+translator_client = None
+
+try:   # ADDED
+    if TRANSLATOR_KEY and TRANSLATOR_ENDPOINT and TRANSLATOR_REGION:
+        credential = TranslatorCredential(TRANSLATOR_KEY, TRANSLATOR_REGION)
+        translator_client = TextTranslationClient(
+            endpoint=TRANSLATOR_ENDPOINT,
+            credential=credential,
+        )
+        logger.info("Azure translation client loaded successfully.")
+    else:
+        logger.error(
+            "Missing Azure Translator configuration. "
+            "Set TRANSLATOR_KEY, TRANSLATOR_ENDPOINT, and TRANSLATOR_REGION."
+        )
+except Exception as e:
+    logger.error(f"Failed to initialise Azure translation client: {e}")
+    translator_client = None
+
 
 def translate_segment_text(text: str, src_lang: str, dest_lang: str) -> str:
-    raise NotImplementedError(
-        "Translate and return the text"
-    )
+    if text is None:
+        return ""
+
+    text = text.strip()
+
+    if text == "":
+        return ""
+
+    if src_lang == dest_lang:
+        return text
+
+    if translator_client is None:
+        return text
+
+    try:
+        response = translator_client.translate(
+            content=[InputTextItem(text=text)],
+            to=[dest_lang],
+            from_parameter=src_lang,
+        )
+
+        if response and response[0].translations:
+            translated_text = response[0].translations[0].text
+            if translated_text:
+                return translated_text
+
+    except Exception:
+        pass
+
+    return text
 
 
 def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicroservice) -> None:
