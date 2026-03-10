@@ -20,5 +20,5 @@ qwen-tts
 kafka-python
 psycopg[binary]
 
-rubberband
 numpy
+rubberband
