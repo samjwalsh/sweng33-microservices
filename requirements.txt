@@ -21,3 +21,4 @@ kafka-python
 psycopg[binary]
 
 rubberband
+numpy
