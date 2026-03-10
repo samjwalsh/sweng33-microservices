@@ -5,7 +5,6 @@ import subprocess
 import json
 from pathlib import Path
 import tempfile
-from audio_utils import AudioStretch
 
 CURRENT_DIR = Path(__file__).resolve().parent
 KAFKA_DIR = CURRENT_DIR.parent
@@ -13,7 +12,7 @@ if str(KAFKA_DIR) not in sys.path:
     sys.path.insert(0, str(KAFKA_DIR))
 
 from db_helper import TTSSegment, get_segments_for_src_blob
-from audio_utils import merge_audio, extract_audio, stitch_audio_with_timestamps, prepare_segment
+from audio_utils import merge_audio, stitch_audio_with_timestamps
 from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_reconstruct_payload
 from topics import TOPIC_RECONSTRUCT_VIDEO
@@ -103,13 +102,18 @@ def reconstruct_video(*, src_blob: str, segments: list[TTSSegment]) -> str:
 
         for seg in sorted(segments, key=lambda s: s.start):
             raw_path = wav_dir / f"raw_{seg.segment_id}.wav"
-            prepared_path = wav_dir / f"segment_{seg.segment_id}.wav"
-            download_blob_to_file(blob_location=seg.gen_blob,output_path=raw_path)
-            prepare_segment(raw_path,seg.start,seg.end,prepared_path) # assuming seg.start & seg.end is pre-translation timestamps & .wav is the translated .wav file
+            fitted_path = wav_dir / f"fitted_{seg.segment_id}.wav"
+
+            download_blob_to_file(blob_location=seg.gen_blob, output_path=raw_path)
+            fit_segment_audio_to_timing(
+                segment=seg,
+                input_audio_path=raw_path,
+                output_audio_path=fitted_path,
+            )
             segments_info.append({
-                "path":prepared_path,
-                "start":seg.start,
-                "end":seg.end
+                "path": fitted_path,
+                "start": seg.start,
+                "end": seg.end,
             })
 
         stitched_wav = tmp_dir / "stitched.wav"

@@ -160,8 +160,3 @@ def ffprobe_duration(path: Union[str, Path]) -> float:
 
     return float(json.loads(p.stdout)["format"]["duration"])
 
-def prepare_segment(input_wav: str | Path, start_sec: float, end_sec: float, output_path: str | Path) -> Path:
-    target_duration = end_sec - start_sec
-    snippet_path = get_audio_snippet(input_wav, start_sec, end_sec, output_path)
-    stretch_path = stretch_audio_to_time(snippet_path,target_duration,output_path)
-    return Path(stretch_path)

@@ -19,3 +19,5 @@ azure-ai-transcription
 qwen-tts
 kafka-python
 psycopg[binary]
+
+rubberband
