@@ -1,49 +1,69 @@
 stages:
+  - lint
   - test
+  - typecheck
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHONPATH: "." 
+  PYTHONPATH: "."
 
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - .cache/pip
-    - .venv/
 
-test:
-  stage: test
+default:
   image: python:3.11-slim
-  tags:        
+  tags:
     - docker
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends ffmpeg git
-    
     - python -m venv .venv
     - source .venv/bin/activate
-    - touch coverage.xml report.xml
     - pip install --upgrade pip
-    - pip install pytest pytest-cov
     - pip install -r requirements.txt
-    - pip install pytest-cov
+
+
+lint:
+  stage: lint
+  script:
+    - source .venv/bin/activate
+    - pip install ruff
+    - ruff check .
+
+typecheck:
+  stage: typecheck
+  script:
+    - source .venv/bin/activate
+    - pip install mypy
+    - mypy .
+
+test:
+  stage: test
 
   script:
     - source .venv/bin/activate
-        - pytest tests/ -v \
-        --cov=app \
+    - pip install pytest pytest-cov
+
+    - pytest tests/ -v \
+        --cov=. \
         --cov-report=term-missing \
         --cov-report=xml:coverage.xml \
-        --junitxml=report.xml || true
-    - ls -la coverage.xml report.xml || true
+        --junitxml=report.xml
 
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-  
+
   artifacts:
     when: always
+
+    reports:
+      junit: report.xml
+
     paths:
       - coverage.xml
       - report.xml
+
     expire_in: 30 days
 
-  rules:
-    - when: always
+rules:
+  - when: always
