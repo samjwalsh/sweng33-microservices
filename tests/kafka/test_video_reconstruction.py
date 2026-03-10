@@ -3,6 +3,8 @@ import subprocess
 from unittest.mock import MagicMock
 from pathlib import Path
 import sys
+from db_helper import TTSSegment  # type: ignore
+from reconstruction_service import reconstruct_video  # type: ignore
 
 kafka_dir = Path(__file__).resolve().parents[2] / "kafka"
 sys.path.insert(0, str(kafka_dir))
@@ -31,7 +33,7 @@ def make_mp4(path, duration_s=5.0):
 
 @pytest.fixture
 def fake_segments():
-    from db_helper import TTSSegment  # type: ignore
+
     src_blob = "blob/original.mp4"
     return [
         TTSSegment(segment_id=1, speaker_id="s1", start=0.0, end=2.0, gen_blob="blob/seg1.wav", src_blob=src_blob),
@@ -64,7 +66,7 @@ def reconstruction_env(fake_blob_download, mock_upload, fake_blob_name):
     pass
 
 def test_reconstruct_video_uploads_output(fake_segments, reconstruction_env, mock_upload):
-    from reconstruction_service import reconstruct_video  # type: ignore
+
     reconstruct_video(src_blob="blob/original.mp4", segments=fake_segments)
     mock_upload.assert_called_once()
     args, kwargs = mock_upload.call_args
@@ -72,15 +74,12 @@ def test_reconstruct_video_uploads_output(fake_segments, reconstruction_env, moc
     assert upload_path.suffix == ".mp4"
 
 def test_reconstruct_video_download_failure_raises(fake_blob_name, mock_upload, monkeypatch):
-    from reconstruction_service import reconstruct_video  # type: ignore
-    from db_helper import TTSSegment  # type: ignore
     monkeypatch.setattr("reconstruction_service.download_blob_to_file", MagicMock(side_effect=RuntimeError("Storage unavailable")),)
     segments = [TTSSegment(segment_id=1, speaker_id="s1", start=0.0, end=2.0, gen_blob="blob/seg1.wav", src_blob="blob/original.mp4")]
     with pytest.raises(Exception):
         reconstruct_video(src_blob="blob/original.mp4", segments=segments)
 
 def test_reconstruct_video_upload_failure_raises(fake_segments, fake_blob_download, fake_blob_name, monkeypatch):
-    from reconstruction_service import reconstruct_video  # type: ignore
     monkeypatch.setattr("reconstruction_service.upload_file",MagicMock(side_effect=IOError("Upload failed")),)
     with pytest.raises(Exception):
         reconstruct_video(src_blob="blob/original.mp4", segments=fake_segments)
