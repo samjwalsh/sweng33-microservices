@@ -18,11 +18,11 @@ default:
     - docker
 
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends \
-          ffmpeg \
-          git \
-          libsndfile1 \
-          rubberband-cli
+    - apt-get update -y && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        git \
+        libsndfile1 \
+        rubberband-cli
 
     - python -m venv .venv
     - source .venv/bin/activate
