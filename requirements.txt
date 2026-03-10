@@ -15,8 +15,9 @@ python-dotenv
 
 numpy<2.0
 soundfile
-azure-ai-translation-text
+azure-ai-translation-text==1.0.0b1
 azure-ai-transcription
+azure-ai-textanalytics
 qwen-tts
 kafka-python
 psycopg[binary]
