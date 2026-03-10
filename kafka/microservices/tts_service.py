@@ -28,23 +28,26 @@ def select_voice_clone_training_segments(
     return ranked[:max_training_segments]
 
 
+# This function takes in the link to the source video, and some segments
+# It finds those segments in the source video and extracts the audio of each one into a new
+# wav file (to be used for voice cloning training), and uploads this wav file to blob storage
+# and returns the link to that file.
 def prepare_voice_clone_training_data(
     *,
     src_blob: str,
-    speaker_id: str,
     training_segments: list[dict[str, Any]],
-) -> list[str]:
+) -> str:
     raise NotImplementedError(
         "Implement extraction of source-audio clips for the selected training segments. "
-        "Return a list of paths or blob references pointing to audio samples for voice cloning."
+        "Return a the path to the wav file which contains the selected training segments' audio"
     )
 
 
+# This function takes the training audio link and uses it to clone the voice to be used for the next step
 def clone_voice_once(
     *,
     src_blob: str,
-    speaker_id: str,
-    training_audio_refs: list[str],
+    training_audio_refs: str,
 ) -> str:
     raise NotImplementedError(
         "Implement voice cloning here. "
@@ -53,11 +56,10 @@ def clone_voice_once(
     )
 
 
+# This function takes in some text and a voice profile. 
+# Generate audio using the profile and text and return the blob url of the wav file where it is stored. 
 def synthesize_segment_audio(
     *,
-    src_blob: str,
-    speaker_id: str,
-    segment_id: int,
     text: str,
     voice_profile_id: str,
 ) -> str:
@@ -82,21 +84,16 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
 
     training_audio_refs = prepare_voice_clone_training_data(
         src_blob=src_blob,
-        speaker_id=speaker_id,
         training_segments=training_segments,
     )
 
     voice_profile_id = clone_voice_once(
         src_blob=src_blob,
-        speaker_id=speaker_id,
         training_audio_refs=training_audio_refs,
     )
 
     for segment in segments:
         gen_blob = synthesize_segment_audio(
-            src_blob=src_blob,
-            speaker_id=speaker_id,
-            segment_id=segment["segment_id"],
             text=segment["text"],
             voice_profile_id=voice_profile_id,
         )

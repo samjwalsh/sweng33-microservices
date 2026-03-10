@@ -13,14 +13,19 @@ from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_ingest_payload
 from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
 
-
+# src_blob is a link to a video file in blob storage.
+# This function will have to take the link to the video, download the video, process it in some way (probably to isolate the audio track),
+# then use some kind of model to detect what language is being spoken.
+# Return the name of that language
 def detect_source_language(src_blob: str) -> str:
     raise NotImplementedError(
         "Implement source-language detection here using your team's tooling. "
         "Return a short language code such as 'en' or 'fr'."
     )
 
-
+# This function will take in a link to the video in blob storage as well as the language the video is in.
+# It will diarize and transcribe the file and return an array of segments, each segment looks like this:
+# {'segment_id': int, 'speaker_id': str, 'start': float, 'end': float, 'text': str}
 def diarize_and_transcribe(src_blob: str, src_lang: str) -> list[dict[str, Any]]:
     raise NotImplementedError(
         "Implement diarization/transcription here using your team's tooling. "

@@ -3,6 +3,7 @@ import json
 import os
 import signal
 import time
+import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -88,30 +89,38 @@ class KafkaMicroservice:
             f"group='{self.group_id}' broker='{self.bootstrap_server}'"
         )
 
-        while self.running:
-            records = self.consumer.poll(timeout_ms=1000)
-            if not records:
-                continue
+        try:
+            while self.running:
+                records = self.consumer.poll(timeout_ms=1000)
+                if not records:
+                    continue
 
-            for _, messages in records.items():
-                for message in messages:
-                    value = message.value
-                    if not isinstance(value, dict):
-                        print(f"[{self.service_name}] Skipping non-object payload at offset {message.offset}")
-                        continue
+                for _, messages in records.items():
+                    for message in messages:
+                        value = message.value
+                        if not isinstance(value, dict):
+                            print(f"[{self.service_name}] Skipping non-object payload at offset {message.offset}")
+                            continue
 
-                    context = MessageContext(
-                        topic=message.topic,
-                        partition=message.partition,
-                        offset=message.offset,
-                        key=message.key,
-                    )
-                    handler(value, context, self)
-
-        self.producer.flush()
-        self.producer.close()
-        self.consumer.close()
-        print(f"[{self.service_name}] Stopped")
+                        context = MessageContext(
+                            topic=message.topic,
+                            partition=message.partition,
+                            offset=message.offset,
+                            key=message.key,
+                        )
+                        try:
+                            handler(value, context, self)
+                        except Exception as error:
+                            print(
+                                f"[{self.service_name}] Handler failed for topic='{context.topic}' "
+                                f"partition={context.partition} offset={context.offset}: {error}"
+                            )
+                            traceback.print_exc()
+        finally:
+            self.producer.flush()
+            self.producer.close()
+            self.consumer.close()
+            print(f"[{self.service_name}] Stopped")
 
 
 def example_handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicroservice) -> None:
