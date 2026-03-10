@@ -1,5 +1,2 @@
 [lint]
 ignore = ["E402"]
-
-[lint.per-file-ignores]
-"tests/*" = ["F401"]
