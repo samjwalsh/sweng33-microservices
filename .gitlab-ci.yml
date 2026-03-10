@@ -18,12 +18,7 @@ default:
     - docker
 
   before_script:
-    - apt-get update -y && apt-get install -y --no-install-recommends \
-        ffmpeg \
-        git \
-        libsndfile1 \
-        rubberband-cli
-
+    - apt-get update -y && apt-get install -y --no-install-recommends ffmpeg git libsndfile1 rubberband-cli
     - python -m venv .venv
     - source .venv/bin/activate
     - pip install --upgrade pip
@@ -46,14 +41,13 @@ typecheck:
 
 test:
   stage: test
-
   script:
     - source .venv/bin/activate
     - pip install pytest pytest-cov
-    - pytest tests/ -v \
-        --cov=. \
-        --cov-report=term-missing \
-        --cov-report=xml:coverage.xml \
+    - pytest tests/ -v
+        --cov=.
+        --cov-report=term-missing
+        --cov-report=xml:coverage.xml
         --junitxml=report.xml
 
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
