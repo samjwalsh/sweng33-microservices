@@ -16,13 +16,13 @@ default:
   image: python:3.11-slim
   tags:
     - docker
+
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends ffmpeg git
     - python -m venv .venv
     - source .venv/bin/activate
     - pip install --upgrade pip
     - pip install -r requirements.txt
-
 
 lint:
   stage: lint
@@ -44,7 +44,6 @@ test:
   script:
     - source .venv/bin/activate
     - pip install pytest pytest-cov
-
     - pytest tests/ -v \
         --cov=. \
         --cov-report=term-missing \
@@ -55,15 +54,9 @@ test:
 
   artifacts:
     when: always
-
     reports:
       junit: report.xml
-
     paths:
       - coverage.xml
       - report.xml
-
     expire_in: 30 days
-
-rules:
-  - when: always
