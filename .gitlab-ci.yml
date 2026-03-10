@@ -17,12 +17,18 @@ default:
   tags:
     - docker
 
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends ffmpeg git
-    - python -m venv .venv
-    - source .venv/bin/activate
-    - pip install --upgrade pip
-    - pip install -r requirements.txt
+before_script:
+  - apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        git \
+        libsndfile1 \
+        rubberband-cli
+
+  - python -m venv .venv
+  - source .venv/bin/activate
+  - pip install --upgrade pip
+  - pip install -r requirements.txt
+
 
 lint:
   stage: lint
