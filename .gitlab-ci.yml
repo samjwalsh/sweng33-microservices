@@ -50,13 +50,15 @@ test:
         --cov-report=term-missing
         --cov-report=xml:coverage.xml
         --junitxml=report.xml
-
+        --tb=short
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-
   artifacts:
     when: always
     reports:
       junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
     paths:
       - coverage.xml
       - report.xml
