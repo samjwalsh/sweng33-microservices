@@ -13,6 +13,7 @@ pytest-cov
 PyYAML
 python-dotenv
 
+numpy<2.0
 soundfile
 azure-ai-translation-text
 azure-ai-transcription
@@ -20,5 +21,4 @@ qwen-tts
 kafka-python
 psycopg[binary]
 
-numpy
 rubberband
