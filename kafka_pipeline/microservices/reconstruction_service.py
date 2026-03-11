@@ -1,11 +1,11 @@
+from __future__ import annotations  # optional, helps with type hints in Python <3.11
+
 import argparse
 import time
 import subprocess
 import json
 from pathlib import Path
 import tempfile
-
-from __future__ import annotations  # optional, helps with type hints in Python <3.11
 
 from typing import Union
 
