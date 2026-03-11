@@ -2,10 +2,10 @@ import argparse
 import time
 from typing import Any
 
-from ..db_helper import are_all_segments_generated, set_tts_generated_blob
-from ..microservice_template import KafkaMicroservice, MessageContext
-from ..payload_validation import PayloadValidationError, validate_tts_payload
-from ..topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
+from kafka_pipeline.db_helper import are_all_segments_generated, set_tts_generated_blob
+from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
+from kafka_pipeline.payload_validation import PayloadValidationError, validate_tts_payload
+from kafka_pipeline.topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
 
 
 def select_voice_clone_training_segments(

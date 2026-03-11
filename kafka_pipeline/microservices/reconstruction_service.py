@@ -9,12 +9,12 @@ import tempfile
 
 from typing import Union
 
-from ..db_helper import TTSSegment, get_segments_for_src_blob
-from ..audio_utils import merge_audio, stitch_audio_with_timestamps
-from ..microservice_template import KafkaMicroservice, MessageContext
-from ..payload_validation import PayloadValidationError, validate_reconstruct_payload
-from ..topics import TOPIC_RECONSTRUCT_VIDEO
-from ..blob_helper import upload_file, download_blob_to_file, build_reconstruction_blob_name
+from kafka_pipeline.db_helper import TTSSegment, get_segments_for_src_blob
+from kafka_pipeline.audio_utils import merge_audio, stitch_audio_with_timestamps
+from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
+from kafka_pipeline.payload_validation import PayloadValidationError, validate_reconstruct_payload
+from kafka_pipeline.topics import TOPIC_RECONSTRUCT_VIDEO
+from kafka_pipeline.blob_helper import upload_file, download_blob_to_file, build_reconstruction_blob_name
 
 def fit_segment_audio_to_timing(*, segment: TTSSegment, input_audio_path: str, output_audio_path: str) -> str:
     "Given a TTSSegment with start/end timing and an input audio file, stretch or compress the audio to fit the target duration. "
