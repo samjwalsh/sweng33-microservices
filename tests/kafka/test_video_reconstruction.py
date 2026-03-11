@@ -3,12 +3,13 @@ import subprocess
 from unittest.mock import MagicMock
 from pathlib import Path
 import sys
-from db_helper import TTSSegment  # type: ignore
-from reconstruction_service import reconstruct_video  # type: ignore
 
 kafka_dir = Path(__file__).resolve().parents[2] / "kafka"
 sys.path.insert(0, str(kafka_dir))
 sys.path.insert(0, str(kafka_dir / "microservices"))
+
+from db_helper import TTSSegment  # type: ignore
+from reconstruction_service import reconstruct_video  # type: ignore
 
 """
 .wav and .mp4 files are generated automatically for testing. 
