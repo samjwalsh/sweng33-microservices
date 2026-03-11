@@ -4,15 +4,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-CURRENT_DIR = Path(__file__).resolve().parent
-KAFKA_DIR = CURRENT_DIR.parent
-if str(KAFKA_DIR) not in sys.path:
-    sys.path.insert(0, str(KAFKA_DIR))
-
-from db_helper import are_all_segments_generated, set_tts_generated_blob
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_tts_payload
-from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
+from ..db_helper import are_all_segments_generated, set_tts_generated_blob
+from ..microservice_template import KafkaMicroservice, MessageContext
+from ..payload_validation import PayloadValidationError, validate_tts_payload
+from ..topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
 
 
 def select_voice_clone_training_segments(

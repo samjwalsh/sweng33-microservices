@@ -6,18 +6,16 @@ import json
 from pathlib import Path
 import tempfile
 
-CURRENT_DIR = Path(__file__).resolve().parent
-KAFKA_DIR = CURRENT_DIR.parent
-if str(KAFKA_DIR) not in sys.path:
-    sys.path.insert(0, str(KAFKA_DIR))
+from __future__ import annotations  # optional, helps with type hints in Python <3.11
 
-from db_helper import TTSSegment, get_segments_for_src_blob
-from audio_utils import merge_audio, stitch_audio_with_timestamps
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_reconstruct_payload
-from topics import TOPIC_RECONSTRUCT_VIDEO
 from typing import Union
-from blob_helper import upload_file, download_blob_to_file, build_reconstruction_blob_name
+
+from ..db_helper import TTSSegment, get_segments_for_src_blob
+from ..audio_utils import merge_audio, stitch_audio_with_timestamps
+from ..microservice_template import KafkaMicroservice, MessageContext
+from ..payload_validation import PayloadValidationError, validate_reconstruct_payload
+from ..topics import TOPIC_RECONSTRUCT_VIDEO
+from ..blob_helper import upload_file, download_blob_to_file, build_reconstruction_blob_name
 
 def fit_segment_audio_to_timing(*, segment: TTSSegment, input_audio_path: str, output_audio_path: str) -> str:
     "Given a TTSSegment with start/end timing and an input audio file, stretch or compress the audio to fit the target duration. "
