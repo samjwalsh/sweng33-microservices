@@ -1,7 +1,5 @@
 import argparse
-import sys
 import time
-from pathlib import Path
 from typing import Any
 
 from ..db_helper import are_all_segments_generated, set_tts_generated_blob

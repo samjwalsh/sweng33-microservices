@@ -1,7 +1,5 @@
 import argparse
-import sys
 import time
-from pathlib import Path
 from typing import Any
 
 CURRENT_DIR = Path(__file__).resolve().parent

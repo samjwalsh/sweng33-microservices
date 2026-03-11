@@ -1,12 +1,10 @@
 import argparse
-import sys
 import time
 
 import os
 import logging
 from dotenv import load_dotenv
 from collections import defaultdict
-from pathlib import Path
 from typing import Any
 from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
 from azure.ai.translation.text.models import InputTextItem
