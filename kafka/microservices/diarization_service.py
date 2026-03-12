@@ -1,6 +1,8 @@
 import argparse
 import sys
 import time
+import subprocess  # For running ffmpeg
+import logging     # For error logging
 from pathlib import Path
 from typing import Any
 
@@ -12,16 +14,59 @@ if str(KAFKA_DIR) not in sys.path:
 from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_ingest_payload
 from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
+from kafka.blob_helper import download_blob_to_file
+
+import whisper 
+logger = logging.getLogger("diarization-service")
+model = whisper.load_model("base") # This loads the AI into memory
 
 # src_blob is a link to a video file in blob storage.
 # This function will have to take the link to the video, download the video, process it in some way (probably to isolate the audio track),
 # then use some kind of model to detect what language is being spoken.
 # Return the name of that language
 def detect_source_language(src_blob: str) -> str:
-    raise NotImplementedError(
-        "Implement source-language detection here using your team's tooling. "
-        "Return a short language code such as 'en' or 'fr'."
-    )
+    # Setup temporary file paths
+    video_tmp = Path(f"/tmp/video_{hash(src_blob)}.mp4")
+    audio_tmp = video_tmp.with_suffix(".wav")
+    
+    try:
+        # Download from Blob Storage
+        download_blob_to_file(src_blob, video_tmp)
+        
+        # Extract Audio (using ffmpeg )
+        # only use the first 30 seconds for language ID
+        subprocess.run([
+            'ffmpeg', '-i', str(video_tmp), '-t', '30', 
+            '-ar', '16000', '-ac', '1', str(audio_tmp), '-y'
+        ], check=True, capture_output=True)
+
+        # Detect Language
+        # load audio and pad/trim it to fit 30 seconds
+        audio = whisper.load_audio(str(audio_tmp))
+        audio = whisper.pad_or_trim(audio)
+        
+        # make log-Mel spectrogram and move to the same device as the model
+        mel = whisper.log_mel_spectrogram(audio).to(model.device)
+        
+        # detect the spoken language
+        _, probs = model.detect_language(mel)
+        lang_code = max(probs, key=probs.get)
+
+        return lang_code # Returns 'en', 'fr', etc.
+
+    except Exception as e:
+        #Log clear failure 
+        logger.error(f"Diarization Error: Language detection failed for {src_blob}. Error: {str(e)}")
+        
+        #Return 'und' (undetermined)
+        return "und"
+
+    finally:
+        # Cleanup Remove temp files 
+        for p in [video_tmp, audio_tmp]:
+            if p.exists():
+                p.unlink()
+    
 
 # This function will take in a link to the video in blob storage as well as the language the video is in.
 # It will diarize and transcribe the file and return an array of segments, each segment looks like this:
