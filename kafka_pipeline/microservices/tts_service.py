@@ -7,12 +7,6 @@ from kafka_pipeline.microservice_template import KafkaMicroservice, MessageConte
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_tts_payload
 from kafka_pipeline.topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
 
-
-from db_helper import are_all_segments_generated, set_tts_generated_blob
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_tts_payload
-from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
-
 def select_voice_clone_training_segments(
     segments: list[dict[str, Any]],
     max_training_segments: int = 5,

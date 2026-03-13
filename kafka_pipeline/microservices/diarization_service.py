@@ -5,10 +5,6 @@ from kafka_pipeline.microservice_template import KafkaMicroservice, MessageConte
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_ingest_payload
 from kafka_pipeline.topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
 
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_ingest_payload
-from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
-
 # src_blob is a link to a video file in blob storage.
 # This function will have to take the link to the video, download the video, process it in some way (probably to isolate the audio track),
 # then use some kind of model to detect what language is being spoken.

@@ -10,10 +10,10 @@ from azure.ai.translation.text import TextTranslationClient, TranslatorCredentia
 from azure.ai.translation.text.models import InputTextItem
 
 
-from db_helper import upsert_tts_placeholder
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_translate_payload
-from topics import TOPIC_TEXT_TO_SPEECH, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob_and_speaker
+from kafka_pipeline.db_helper import upsert_tts_placeholder
+from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
+from kafka_pipeline.payload_validation import PayloadValidationError, validate_translate_payload
+from kafka_pipeline.topics import TOPIC_TEXT_TO_SPEECH, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob_and_speaker
 
 logger = logging.getLogger(__name__)
 load_dotenv() 
