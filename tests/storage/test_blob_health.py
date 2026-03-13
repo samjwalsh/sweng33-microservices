@@ -7,7 +7,7 @@ load_dotenv()
 connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 
 @pytest.mark.skipif(
-    not os.getenv("AZURE_STORAGE_CONNECTION_STRING"),
+    not connection_string,
     reason="Requires Azure Blob Storage access"
 )
 def test_blob_health():
