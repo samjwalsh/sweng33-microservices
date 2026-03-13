@@ -1,5 +1,4 @@
 import argparse
-import time
 from typing import Any
 
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
