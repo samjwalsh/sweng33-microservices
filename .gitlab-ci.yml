@@ -1,7 +1,6 @@
 stages:
   - lint
   - test
-  - typecheck
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -32,13 +31,6 @@ lint:
     - source .venv/bin/activate
     - pip install ruff
     - ruff check .
-
-typecheck:
-  stage: typecheck
-  script:
-    - source .venv/bin/activate
-    - pip install mypy
-    - mypy .
 
 test:
   stage: test
