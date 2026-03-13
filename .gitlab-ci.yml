@@ -1,6 +1,7 @@
 stages:
   - lint
   - test
+  - coverage
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -55,3 +56,37 @@ test:
       - coverage.xml
       - report.xml
     expire_in: 30 days
+
+coverage_check:
+  stage: coverage_check
+  script:
+    - source .venv/bin/activate
+    - pip install xmltodict
+    - |
+      python - <<'EOF'
+      import xmltodict
+
+      # Load coverage.xml
+      with open("coverage.xml") as f:
+          coverage_xml = xmltodict.parse(f.read())
+
+      # Extract total coverage
+      totals = coverage_xml['coverage']['project']['@line-rate']
+      current_coverage = float(totals) * 100
+
+      # Load baseline coverage
+      with open("coverage_baseline.txt") as f:
+          baseline = float(f.read().strip())
+
+      print(f"Current coverage: {current_coverage:.2f}%")
+      print(f"Baseline coverage: {baseline:.2f}%")
+
+      if current_coverage < baseline:
+          print("Coverage decreased! Failing CI.")
+          exit(1)
+      else:
+          print("Coverage check passed!")
+      EOF
+  dependencies:
+    - test
+  allow_failure: false
