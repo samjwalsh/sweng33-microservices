@@ -1,17 +1,10 @@
-import argparse
-import sys
 import time
-from pathlib import Path
+import argparse
 from typing import Any
 
-CURRENT_DIR = Path(__file__).resolve().parent
-KAFKA_DIR = CURRENT_DIR.parent
-if str(KAFKA_DIR) not in sys.path:
-    sys.path.insert(0, str(KAFKA_DIR))
-
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_ingest_payload
-from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
+from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
+from kafka_pipeline.payload_validation import PayloadValidationError, validate_ingest_payload
+from kafka_pipeline.topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
 
 # src_blob is a link to a video file in blob storage.
 # This function will have to take the link to the video, download the video, process it in some way (probably to isolate the audio track),

@@ -1,25 +1,19 @@
 import argparse
-import sys
 import time
 
 import os
 import logging
 from dotenv import load_dotenv
 from collections import defaultdict
-from pathlib import Path
 from typing import Any
 from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
 from azure.ai.translation.text.models import InputTextItem
 
-CURRENT_DIR = Path(__file__).resolve().parent
-KAFKA_DIR = CURRENT_DIR.parent
-if str(KAFKA_DIR) not in sys.path:
-    sys.path.insert(0, str(KAFKA_DIR))
 
-from db_helper import upsert_tts_placeholder
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_translate_payload
-from topics import TOPIC_TEXT_TO_SPEECH, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob_and_speaker
+from kafka_pipeline.db_helper import upsert_tts_placeholder
+from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
+from kafka_pipeline.payload_validation import PayloadValidationError, validate_translate_payload
+from kafka_pipeline.topics import TOPIC_TEXT_TO_SPEECH, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob_and_speaker
 
 logger = logging.getLogger(__name__)
 load_dotenv() 
@@ -46,7 +40,6 @@ try:   # ADDED
 except Exception as e:
     logger.error(f"Failed to initialise Azure translation client: {e}")
     translator_client = None
-
 
 def translate_segment_text(text: str, src_lang: str, dest_lang: str) -> str:
     if text is None:
