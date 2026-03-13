@@ -41,15 +41,6 @@ except Exception as e:
     logger.error(f"Failed to initialise Azure translation client: {e}")
     translator_client = None
 
-from kafka_pipeline.db_helper import upsert_tts_placeholder
-from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
-from kafka_pipeline.payload_validation import PayloadValidationError, validate_translate_payload
-from kafka_pipeline.topics import (
-    TOPIC_TEXT_TO_SPEECH,
-    TOPIC_TRANSLATE_SEGMENTS,
-    key_by_src_blob_and_speaker,
-)
-
 def translate_segment_text(text: str, src_lang: str, dest_lang: str) -> str:
     if text is None:
         return ""
