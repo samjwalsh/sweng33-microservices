@@ -14,9 +14,9 @@ from payload_validation import PayloadValidationError, validate_ingest_payload
 from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
 
 from tempfile import TemporaryDirectory
-from pathlib import Path
 from blob_helper import download_blob_to_file
 from src.ml_models.diarization import diarize
+from src.ml_models.transcriber import transcribe_with_timestamps
 
 
 def detect_source_language(src_blob: str) -> str:
@@ -24,6 +24,16 @@ def detect_source_language(src_blob: str) -> str:
         "Implement source-language detection here using your team's tooling. "
         "Return a short language code such as 'en' or 'fr'."
     )
+
+def text_for_time_range(words, start: float, end: float) -> str:
+    matched_words: list[str] = []
+
+    for word in words:
+        midpoint = (word.start + word.end) / 2
+        if start <= midpoint < end:
+            matched_words.append(word.word.strip())
+
+    return " ".join(matched_words).strip()
 
 
 def diarize_and_transcribe(src_blob: str, src_lang: str) -> list[dict[str, Any]]:
@@ -36,16 +46,29 @@ def diarize_and_transcribe(src_blob: str, src_lang: str) -> list[dict[str, Any]]
         )
 
         diarization_segments = diarize(str(local_wav))
+        diarization_segments = sorted(diarization_segments, key=lambda seg: seg["start"])
+
+        transcription = transcribe_with_timestamps(
+            wav_path=local_wav,
+            timestamp_level="word",
+        )
 
         segments: list[dict[str, Any]] = []
         for idx, seg in enumerate(diarization_segments):
+            seg_start = float(seg["start"])
+            seg_end = float(seg["end"])
+
             segments.append(
                 {
                     "segment_id": idx,
                     "speaker_id": seg["speaker"],
-                    "start": seg["start"],
-                    "end": seg["end"],
-                    "text": "",
+                    "start": seg_start,
+                    "end": seg_end,
+                    "text": text_for_time_range(
+                        transcription.words,
+                        seg_start,
+                        seg_end,
+                    ),
                 }
             )
 
