@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from pathlib import Path
 import sys
 
-kafka_dir = Path(__file__).resolve().parents[2] / "kafka"
+kafka_dir = Path(__file__).resolve().parents[2] / "kafka_pipeline"
 sys.path.insert(0, str(kafka_dir))
 sys.path.insert(0, str(kafka_dir / "microservices"))
 
@@ -64,7 +64,7 @@ def fake_blob_name(monkeypatch):
 
 @pytest.fixture
 def reconstruction_env(fake_blob_download, mock_upload, fake_blob_name):
-    pass
+    return None
 
 def test_reconstruct_video_uploads_output(fake_segments, reconstruction_env, mock_upload):
 
