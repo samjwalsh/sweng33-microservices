@@ -66,15 +66,12 @@ coverage:
       python - <<'EOF'
       import xmltodict
 
-      # Load coverage.xml
       with open("coverage.xml") as f:
           coverage_xml = xmltodict.parse(f.read())
 
-      # Extract total coverage
-      totals = coverage_xml['coverage']['project']['@line-rate']
+      totals = coverage_xml['coverage']['@line-rate']
       current_coverage = float(totals) * 100
 
-      # Load baseline coverage
       with open("coverage_baseline.txt") as f:
           baseline = float(f.read().strip())
 
