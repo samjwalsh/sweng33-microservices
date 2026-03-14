@@ -18,6 +18,10 @@ class TranscriptionResult:
     words: list[WordTimestamp]
     model_name: str
 
+_ASR_PIPELINE = None
+_ASR_MODEL_NAME = None
+_ASR_DEVICE = None
+
 
 def format_timestamp(seconds: float) -> str: #Convert seconds to mm:ss.sss 
     minutes = int(seconds // 60)
@@ -39,6 +43,27 @@ def write_transcript_txt(result: TranscriptionResult, output_path: str | Path) -
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path
 
+def _get_asr_pipeline(model_name: str, device: str, torch_dtype):
+    global _ASR_PIPELINE, _ASR_MODEL_NAME, _ASR_DEVICE
+
+    if (
+        _ASR_PIPELINE is None
+        or _ASR_MODEL_NAME != model_name
+        or _ASR_DEVICE != device
+    ):
+        from transformers import pipeline
+
+        _ASR_PIPELINE = pipeline(
+            task="automatic-speech-recognition",
+            model=model_name,
+            device=0 if device == "cuda" else -1,
+            torch_dtype=torch_dtype,
+        )
+        _ASR_MODEL_NAME = model_name
+        _ASR_DEVICE = device
+
+    return _ASR_PIPELINE
+
 
 def transcribe_with_timestamps(
     wav_path: str | Path,
@@ -59,19 +84,13 @@ def transcribe_with_timestamps(
         raise ValueError("Input file must be a .wav file")
 
     import torch
-    from transformers import pipeline
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     torch_dtype = torch.float16 if device == "cuda" else torch.float32
 
-    speech_to_text_pipeline = pipeline(
-        task="automatic-speech-recognition",
-        model=model_name,
-        device=0 if device == "cuda" else -1,
-        torch_dtype=torch_dtype,
-    )
+    speech_to_text_pipeline = _get_asr_pipeline(model_name, device, torch_dtype)
 
     pipeline_output: dict[str, Any] = speech_to_text_pipeline(
         str(wav_path),
