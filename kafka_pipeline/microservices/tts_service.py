@@ -8,8 +8,9 @@ from kafka_pipeline.payload_validation import PayloadValidationError, validate_t
 from kafka_pipeline.topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
 
 from pathlib import Path
-from blob_helper import download_blob
-from src.ml_models.elevenlabs_tts import clone_voice_from_refs
+from blob_helper import download_blob, upload_file
+from src.ml_models.elevenlabs_tts import (clone_voice_from_refs, generate_tts_audio, convert_mp3_to_wav, save_audio_stream )
+from tempfile import TemporaryDirectory
 _VOICE_PROFILE_CACHE: dict[tuple[str, str], str] = {}
 
 
@@ -75,10 +76,28 @@ def synthesize_segment_audio(
     text: str,
     voice_profile_id: str,
 ) -> str:
-    raise NotImplementedError(
-        "Implement segment synthesis here. "
-        "Use voice_profile_id to generate audio for this segment and return the generated blob/path reference."
-    )
+    
+    with TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        mp3_path = tmpdir_path / "segment.mp3"
+        wav_path = tmpdir_path / "segment.wav"
+
+        audio = generate_tts_audio(
+            voice_id=voice_profile_id,
+            text=text,
+        )
+
+        save_audio_stream(audio, mp3_path)
+        convert_mp3_to_wav(
+            mp3_path=mp3_path,
+            wav_path=wav_path,
+        )
+
+        return upload_file(
+            local_path=wav_path,
+            folder="generated/segments",
+            overwrite=True,
+        )
 
 
 def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicroservice) -> None:
