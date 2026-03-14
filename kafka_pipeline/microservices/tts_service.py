@@ -7,6 +7,12 @@ from kafka_pipeline.microservice_template import KafkaMicroservice, MessageConte
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_tts_payload
 from kafka_pipeline.topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
 
+from pathlib import Path
+from blob_helper import download_blob
+from src.ml_models.elevenlabs_tts import clone_voice_from_refs
+_VOICE_PROFILE_CACHE: dict[tuple[str, str], str] = {}
+
+
 def select_voice_clone_training_segments(
     segments: list[dict[str, Any]],
     max_training_segments: int = 5,
@@ -41,11 +47,25 @@ def clone_voice_once(
     src_blob: str,
     training_audio_refs: str,
 ) -> str:
-    raise NotImplementedError(
-        "Implement voice cloning here. "
-        "Use training_audio_refs to create/retrieve one cloned voice profile for this speaker, "
-        "then return its voice_profile_id."
+    cache_key = (src_blob, training_audio_refs)
+
+    if cache_key in _VOICE_PROFILE_CACHE:
+        return _VOICE_PROFILE_CACHE[cache_key]
+
+    def load_audio_bytes(ref: str) -> bytes:
+        ref_path = Path(ref)
+        if ref_path.exists():
+            return ref_path.read_bytes()
+        return download_blob(ref)
+
+    voice_profile_id = clone_voice_from_refs(
+        voice_name=f"clone_{abs(hash(cache_key))}",
+        training_audio_refs=[training_audio_refs],
+        load_audio_bytes=load_audio_bytes,
     )
+
+    _VOICE_PROFILE_CACHE[cache_key] = voice_profile_id
+    return voice_profile_id
 
 
 # This function takes in some text and a voice profile. 
