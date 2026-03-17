@@ -119,6 +119,11 @@ class KafkaMicroservice:
                             f"partition={context.partition} offset={context.offset} "
                             f"key={context.key} payload={self._serialize_for_log(value)}"
                         )
+                        # Clear start marker for this job
+                        print(
+                            f"[{self.service_name}] --- START processing topic='{context.topic}' "
+                            f"partition={context.partition} offset={context.offset} key={context.key} ---"
+                        )
                         try:
                             handler(value, context, self)
                         except Exception as error:
@@ -127,6 +132,12 @@ class KafkaMicroservice:
                                 f"partition={context.partition} offset={context.offset}: {error}"
                             )
                             traceback.print_exc()
+                        else:
+                            # Clear finished marker for this job
+                            print(
+                                f"[{self.service_name}] === FINISHED processing topic='{context.topic}' "
+                                f"partition={context.partition} offset={context.offset} key={context.key} ==="
+                            )
         finally:
             self.producer.flush()
             self.producer.close()

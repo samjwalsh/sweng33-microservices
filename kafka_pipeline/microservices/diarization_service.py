@@ -1,46 +1,39 @@
-import time
 import argparse
-import sys
+import logging
+import os
+import subprocess
 import time
-import subprocess  # For running ffmpeg
-import logging     # For error logging
 from pathlib import Path
 from typing import Any
-
-CURRENT_DIR = Path(__file__).resolve().parent
-KAFKA_DIR = CURRENT_DIR.parent
-if str(KAFKA_DIR) not in sys.path:
-    sys.path.insert(0, str(KAFKA_DIR))
-
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_ingest_payload
-from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
-
 from tempfile import TemporaryDirectory
-from blob_helper import download_blob_to_file
-from src.ml_models.diarization import diarize
-from src.ml_models.transcriber import transcribe_with_timestamps
+from dotenv import load_dotenv
+
+from kafka_pipeline.blob_helper import download_blob_to_file
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_ingest_payload
 from kafka_pipeline.topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
-CURRENT_DIR = Path(__file__).resolve().parent
-KAFKA_DIR = CURRENT_DIR.parent
-if str(KAFKA_DIR) not in sys.path:
-    sys.path.insert(0, str(KAFKA_DIR))
+from src.ml_models.diarization import diarize
+from src.ml_models.transcriber import transcribe_with_timestamps
 
-from microservice_template import KafkaMicroservice, MessageContext
-from payload_validation import PayloadValidationError, validate_ingest_payload
-from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
-from kafka_pipeline.blob_helper import download_blob_to_file
+load_dotenv()
 
-import whisper 
 logger = logging.getLogger("diarization-service")
-model = whisper.load_model("base") # This loads the AI into memory
+_LANGUAGE_MODEL = None
 
 # src_blob is a link to a video file in blob storage.
 # This function will have to take the link to the video, download the video, process it in some way (probably to isolate the audio track),
 # then use some kind of model to detect what language is being spoken.
 # Return the name of that language
+def _get_language_model():
+    global _LANGUAGE_MODEL
+    if _LANGUAGE_MODEL is None:
+        import whisper
+
+        model_name = os.environ.get("LANGID_WHISPER_MODEL", "tiny").strip() or "tiny"
+        _LANGUAGE_MODEL = whisper.load_model(model_name)
+    return _LANGUAGE_MODEL
+
+
 def detect_source_language(src_blob: str) -> str:
     # Setup temporary file paths
     video_tmp = Path(f"/tmp/video_{hash(src_blob)}.mp4")
@@ -59,14 +52,17 @@ def detect_source_language(src_blob: str) -> str:
 
         # Detect Language
         # load audio and pad/trim it to fit 30 seconds
+        import whisper
+
+        language_model = _get_language_model()
         audio = whisper.load_audio(str(audio_tmp))
         audio = whisper.pad_or_trim(audio)
         
         # make log-Mel spectrogram and move to the same device as the model
-        mel = whisper.log_mel_spectrogram(audio).to(model.device)
+        mel = whisper.log_mel_spectrogram(audio).to(language_model.device)
         
         # detect the spoken language
-        _, probs = model.detect_language(mel)
+        _, probs = language_model.detect_language(mel)
         lang_code = max(probs, key=probs.get)
 
         return lang_code # Returns 'en', 'fr', etc.
@@ -98,12 +94,37 @@ def text_for_time_range(words, start: float, end: float) -> str:
 
 def diarize_and_transcribe(src_blob: str, src_lang: str) -> list[dict[str, Any]]:
     with TemporaryDirectory() as tmpdir:
+        src_suffix = Path(src_blob).suffix or ".bin"
+        local_media = Path(tmpdir) / f"input{src_suffix}"
         local_wav = Path(tmpdir) / "input.wav"
 
         download_blob_to_file(
             blob_location=src_blob,
-            output_path=local_wav,
+            output_path=local_media,
         )
+
+        # Convert source media (e.g., mkv/mp4) into PCM WAV for diarization/transcription.
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(local_media),
+                    "-vn",
+                    "-ac",
+                    "1",
+                    "-ar",
+                    "16000",
+                    str(local_wav),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as error:
+            stderr = (error.stderr or "").strip()
+            raise RuntimeError(f"Failed to convert source media to WAV for src_blob={src_blob}: {stderr}") from error
 
         diarization_segments = diarize(str(local_wav))
         diarization_segments = sorted(diarization_segments, key=lambda seg: seg["start"])
@@ -111,6 +132,9 @@ def diarize_and_transcribe(src_blob: str, src_lang: str) -> list[dict[str, Any]]
         transcription = transcribe_with_timestamps(
             wav_path=local_wav,
             timestamp_level="word",
+            model_name=os.environ.get("TRANSCRIBER_MODEL"),
+            chunk_length_s=int(os.environ.get("TRANSCRIBER_CHUNK_LENGTH_S", "20")),
+            stride_length_s=int(os.environ.get("TRANSCRIBER_STRIDE_LENGTH_S", "4")),
         )
 
         segments: list[dict[str, Any]] = []

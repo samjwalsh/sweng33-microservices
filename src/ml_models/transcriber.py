@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -67,10 +68,10 @@ def _get_asr_pipeline(model_name: str, device: str, torch_dtype):
 
 def transcribe_with_timestamps(
     wav_path: str | Path,
-    model_name: str = "openai/whisper-large-v3",
+    model_name: Optional[str] = None,
     timestamp_level: Literal["word", "chunk"] = "word",
     device: Optional[str] = None,
-    chunk_length_s: int = 30,  # chunk long audio to improve stability
+    chunk_length_s: int = 20,  # shorter chunks reduce peak RAM on CPU
     stride_length_s: int = 5, #overlap between chunks to avoid loss of recording 
 ) -> TranscriptionResult:
 
@@ -87,6 +88,13 @@ def transcribe_with_timestamps(
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    if model_name is None:
+        configured_model = os.environ.get("TRANSCRIBER_MODEL", "").strip()
+        if configured_model:
+            model_name = configured_model
+        else:
+            model_name = "openai/whisper-large-v3" if device == "cuda" else "openai/whisper-base"
 
     torch_dtype = torch.float16 if device == "cuda" else torch.float32
 

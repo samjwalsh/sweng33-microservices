@@ -1,10 +1,26 @@
 from __future__ import annotations
 
+import logging
 import os
 
 from pyannote.audio import Pipeline
 
+try:
+    import torch
+except Exception:  # pragma: no cover - torch import depends on runtime environment
+    torch = None
+
+logger = logging.getLogger(__name__)
+
 _pipeline = None
+
+
+def _get_hf_token() -> str | None:
+    for env_name in ("MY_TOKEN", "HF_TOKEN", "HUGGINGFACE_HUB_TOKEN"):
+        token = os.environ.get(env_name)
+        if token and token.strip():
+            return token.strip()
+    return None
 
 
 def merge_segments(segments: list[dict], gap: float = 0.35) -> list[dict]:
@@ -25,17 +41,70 @@ def drop_short_segments(segments: list[dict], min_dur: float = 0.4) -> list[dict
     return [s for s in segments if (s["end"] - s["start"]) >= min_dur]
 
 
+def _configure_runtime() -> str:
+    """
+    Configure torch runtime to reduce RAM pressure on CPU-heavy hosts.
+
+    Environment variables:
+      DIARIZATION_DEVICE: cpu|cuda (default: cpu)
+      DIARIZATION_NUM_THREADS: positive integer torch thread cap (default: 4)
+    """
+    device_name = os.environ.get("DIARIZATION_DEVICE", "cpu").strip().lower()
+    if device_name not in {"cpu", "cuda"}:
+        device_name = "cpu"
+
+    if torch is not None:
+        raw_threads = os.environ.get("DIARIZATION_NUM_THREADS", "4").strip()
+        try:
+            threads = max(1, int(raw_threads))
+        except ValueError:
+            threads = 4
+
+        torch.set_num_threads(threads)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            # Can fail if interop threads are already initialized.
+            pass
+
+        if device_name == "cuda" and not torch.cuda.is_available():
+            logger.warning("DIARIZATION_DEVICE=cuda requested but CUDA is unavailable; falling back to CPU")
+            device_name = "cpu"
+
+    return device_name
+
+
 def _get_pipeline() -> Pipeline:
     global _pipeline
     if _pipeline is None:
-        token = os.environ.get("MY_TOKEN")
+        device_name = _configure_runtime()
+        token = _get_hf_token()
         if not token:
-            raise RuntimeError("MY_TOKEN not set. Run: export MY_TOKEN='hf_...'")
+            raise RuntimeError(
+                "No Hugging Face token found. Set one of: MY_TOKEN, HF_TOKEN, HUGGINGFACE_HUB_TOKEN."
+            )
 
-        _pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            token=token,
-        )
+        model_id = os.environ.get("DIARIZATION_MODEL", "pyannote/speaker-diarization-3.1")
+
+        try:
+            try:
+                _pipeline = Pipeline.from_pretrained(
+                    model_id,
+                    token=token,
+                )
+            except TypeError:
+                _pipeline = Pipeline.from_pretrained(
+                    model_id,
+                    use_auth_token=token,
+                )
+        except Exception as error:
+            raise RuntimeError(
+                "Failed to load diarization pipeline. Ensure your token is valid and has accepted model terms on Hugging Face for "
+                f"{model_id}. Also verify DIARIZATION_MODEL is correct. Original error: {error}"
+            ) from error
+
+        if torch is not None:
+            _pipeline.to(torch.device(device_name))
     return _pipeline
 
 
@@ -48,7 +117,27 @@ def diarize(audio_path: str) -> list[dict]:
     """
     pipeline = _get_pipeline()
 
-    out = pipeline(audio_path)
+    try:
+        if torch is not None:
+            with torch.inference_mode():
+                out = pipeline(audio_path)
+        else:
+            out = pipeline(audio_path)
+    except (MemoryError, RuntimeError) as error:
+        message = str(error).lower()
+        looks_like_oom = (
+            "out of memory" in message
+            or "std::bad_alloc" in message
+            or "cannot allocate memory" in message
+            or "can't allocate memory" in message
+        )
+        if looks_like_oom:
+            raise RuntimeError(
+                "Diarization ran out of memory. Try setting "
+                "DIARIZATION_NUM_THREADS=2 (or 1), DIARIZATION_DEVICE=cpu, "
+                "and if needed DIARIZATION_MODEL=pyannote/speaker-diarization-3.0."
+            ) from error
+        raise
 
     if hasattr(out, "speaker_diarization"):
         annotation = out.speaker_diarization
