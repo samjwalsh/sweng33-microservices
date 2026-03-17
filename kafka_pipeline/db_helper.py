@@ -136,3 +136,20 @@ def get_segments_for_src_blob(src_blob: str) -> list[TTSSegment]:
             rows = cur.fetchall()
 
     return [_to_segment(row) for row in rows]
+
+
+def set_video_completed_blob(*, src_blob: str, completed_blob: str) -> bool:
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE "pg-drizzle_videos"
+                SET completed_blob = %s,
+                    status = 'done'
+                WHERE blob = %s;
+                """,
+                (completed_blob, src_blob),
+            )
+            updated = cur.rowcount > 0
+        conn.commit()
+    return updated

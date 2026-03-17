@@ -9,7 +9,7 @@ import tempfile
 
 from typing import Union
 
-from kafka_pipeline.db_helper import TTSSegment, get_segments_for_src_blob
+from kafka_pipeline.db_helper import TTSSegment, get_segments_for_src_blob, set_video_completed_blob
 from kafka_pipeline.audio_utils import merge_audio, stitch_audio_with_timestamps
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_reconstruct_payload
@@ -153,6 +153,11 @@ def handler(payload: dict, context: MessageContext, service: KafkaMicroservice) 
     # - store/persist/upload output in the destination your team chooses
     # - return final output reference for logging/integration
     final_output_ref = reconstruct_video(src_blob=src_blob, segments=segments)
+    updated_video = set_video_completed_blob(src_blob=src_blob, completed_blob=final_output_ref)
+    if not updated_video:
+        print(
+            f"[{service.service_name}] Could not update completed_blob for src_blob={src_blob}"
+        )
 
     print(
         f"[{service.service_name}] Reconstructed src_blob={src_blob} "
