@@ -31,7 +31,7 @@ if str(KAFKA_DIR) not in sys.path:
 from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_ingest_payload
 from topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
-from kafka.blob_helper import download_blob_to_file
+from kafka_pipeline.blob_helper import download_blob_to_file
 
 import whisper 
 logger = logging.getLogger("diarization-service")

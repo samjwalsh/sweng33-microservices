@@ -3,9 +3,10 @@ import time
 import subprocess
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
-from kafka.blob_helper import download_blob_to_file, upload_file
+from kafka_pipeline.blob_helper import download_blob_to_file, upload_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
 KAFKA_DIR = CURRENT_DIR.parent

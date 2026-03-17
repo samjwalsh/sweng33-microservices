@@ -77,6 +77,12 @@ class KafkaMicroservice:
         future = self.producer.send(topic, key=key, value=value)
         future.get(timeout=timeout_seconds)
 
+    def _serialize_for_log(self, payload: Any) -> str:
+        try:
+            return json.dumps(payload, ensure_ascii=False, default=str)
+        except TypeError:
+            return repr(payload)
+
     def stop(self, _signum: int, _frame: Any) -> None:
         self.running = False
 
@@ -107,6 +113,11 @@ class KafkaMicroservice:
                             partition=message.partition,
                             offset=message.offset,
                             key=message.key,
+                        )
+                        print(
+                            f"[{self.service_name}] Consumed topic='{context.topic}' "
+                            f"partition={context.partition} offset={context.offset} "
+                            f"key={context.key} payload={self._serialize_for_log(value)}"
                         )
                         try:
                             handler(value, context, self)
