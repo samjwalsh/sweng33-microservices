@@ -7,28 +7,30 @@ import json
 from pathlib import Path
 import tempfile
 
-from typing import Union
+from typing import Optional, Union
 
 from kafka_pipeline.db_helper import TTSSegment, get_segments_for_src_blob, set_video_completed_blob
-from kafka_pipeline.audio_utils import merge_audio, stitch_audio_with_timestamps
+from kafka_pipeline.audio_utils import compose_audio_with_mute_and_overlay, extract_audio, merge_audio
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_reconstruct_payload
 from kafka_pipeline.topics import TOPIC_RECONSTRUCT_VIDEO
 from kafka_pipeline.blob_helper import upload_file, download_blob_to_file, build_reconstruction_blob_name
 
-def fit_segment_audio_to_timing(*, segment: TTSSegment, input_audio_path: str, output_audio_path: str) -> str:
+def fit_segment_audio_to_timing(
+    *,
+    segment: TTSSegment,
+    input_audio_path: str,
+    output_audio_path: str,
+) -> Optional[str]:
     "Given a TTSSegment with start/end timing and an input audio file, stretch or compress the audio to fit the target duration. "
 
-    if segment.end <= segment.start:
+    if segment.end < segment.start:
         raise ValueError(f"Invalid segment timing: start={segment.start} end={segment.end}")
     
     target_duration = segment.end - segment.start
 
-    if target_duration < 0:
-        raise ValueError(f"Invalid segment timing: start={segment.start} end={segment.end}")
-    
-    elif target_duration == 0:
-        "Segment has zero duration, skipping audio generation."
+    if target_duration <= 0:
+        return None
 
     else:
         orig = get_audio_duration(input_audio_path)
@@ -93,6 +95,8 @@ def reconstruct_video(*, src_blob: str, segments: list[TTSSegment]) -> str:
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = Path(tmp_dir)
         original_video = download_blob_to_file(blob_location=src_blob, output_path=tmp_dir / "original.mp4")
+        original_audio = tmp_dir / "original.wav"
+        extract_audio(input_mp4=original_video, output_wav=original_audio)
         wav_dir = tmp_dir / "wavs"
         wav_dir.mkdir()
         segments_info = []
@@ -102,21 +106,42 @@ def reconstruct_video(*, src_blob: str, segments: list[TTSSegment]) -> str:
             fitted_path = wav_dir / f"fitted_{seg.segment_id}.wav"
 
             download_blob_to_file(blob_location=seg.gen_blob, output_path=raw_path)
-            fit_segment_audio_to_timing(
-                segment=seg,
-                input_audio_path=raw_path,
-                output_audio_path=fitted_path,
-            )
+            try:
+                fitted = fit_segment_audio_to_timing(
+                    segment=seg,
+                    input_audio_path=raw_path,
+                    output_audio_path=fitted_path,
+                )
+            except Exception as error:
+                print(
+                    "[reconstruction-service] Skipping segment "
+                    f"segment_id={seg.segment_id} start={seg.start} end={seg.end} "
+                    f"reason={error}"
+                )
+                continue
+
+            if not fitted:
+                print(
+                    "[reconstruction-service] Skipping segment "
+                    f"segment_id={seg.segment_id} start={seg.start} end={seg.end} "
+                    "reason=non-positive_duration"
+                )
+                continue
+
             segments_info.append({
-                "path": fitted_path,
+                "path": fitted,
                 "start": seg.start,
                 "end": seg.end,
             })
 
-        stitched_wav = tmp_dir / "stitched.wav"
-        stitch_audio_with_timestamps(segments_info, stitched_wav)
+        composed_wav = tmp_dir / "composed.wav"
+        compose_audio_with_mute_and_overlay(
+            base_wav_path=original_audio,
+            segments_info=segments_info,
+            output_path=composed_wav,
+        )
         output_mp4 = tmp_dir / "output.mp4"
-        merge_audio(input_wav=stitched_wav,input_mp4=original_video,output_mp4=output_mp4)
+        merge_audio(input_wav=composed_wav, input_mp4=original_video, output_mp4=output_mp4)
         upload_name = build_reconstruction_blob_name(src_blob=src_blob, ext=".mp4")
         upload_file(local_path=output_mp4,blob_name=upload_name)
         return upload_name
