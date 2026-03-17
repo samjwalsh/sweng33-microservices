@@ -1,49 +1,57 @@
 stages:
+  - lint
   - test
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHONPATH: "." 
+  PYTHONPATH: ".:kafka/microservices"
 
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - .cache/pip
-    - .venv/
+
+default:
+  image: python:3.11-slim
+  tags:
+    - docker
+
+  before_script:
+    - apt-get update -y && apt-get install -y --no-install-recommends ffmpeg git libsndfile1 libsndfile1-dev librubberband-dev rubberband-cli pkg-config build-essential
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install "numpy<2.0"
+    - pip install --no-build-isolation -r requirements.txt
+
+
+lint:
+  stage: lint
+  script:
+    - source .venv/bin/activate
+    - pip install ruff
+    - ruff check .
 
 test:
   stage: test
-  image: python:3.11-slim
-  tags:        
-    - docker
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends ffmpeg git
-    
-    - python -m venv .venv
-    - source .venv/bin/activate
-    - touch coverage.xml report.xml
-    - pip install --upgrade pip
-    - pip install pytest pytest-cov
-    - pip install -r requirements.txt
-    - pip install pytest-cov
-
   script:
     - source .venv/bin/activate
-        - pytest tests/ -v \
-        --cov=app \
-        --cov-report=term-missing \
-        --cov-report=xml:coverage.xml \
-        --junitxml=report.xml || true
-    - ls -la coverage.xml report.xml || true
-
+    - pip install pytest pytest-cov
+    - pytest tests/ -v
+        --cov=.
+        --cov-report=term-missing
+        --cov-report=xml:coverage.xml
+        --junitxml=report.xml
+        --tb=short
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-  
   artifacts:
     when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
     paths:
       - coverage.xml
       - report.xml
     expire_in: 30 days
-
-  rules:
-    - when: always

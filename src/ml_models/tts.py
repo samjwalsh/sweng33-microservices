@@ -13,7 +13,7 @@ class TTSSegment:
     text: str
 
 
-class TTS:
+class QwenTTSService:
     """
     wrapper around Qwen3-TTS CustomVoice.
     Input:

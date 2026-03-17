@@ -1,7 +1,5 @@
-import argparse
-import sys
 import time
-from pathlib import Path
+import argparse
 from typing import Any
 
 CURRENT_DIR = Path(__file__).resolve().parent
@@ -17,8 +15,14 @@ from tempfile import TemporaryDirectory
 from blob_helper import download_blob_to_file
 from src.ml_models.diarization import diarize
 from src.ml_models.transcriber import transcribe_with_timestamps
+from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
+from kafka_pipeline.payload_validation import PayloadValidationError, validate_ingest_payload
+from kafka_pipeline.topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
 
-
+# src_blob is a link to a video file in blob storage.
+# This function will have to take the link to the video, download the video, process it in some way (probably to isolate the audio track),
+# then use some kind of model to detect what language is being spoken.
+# Return the name of that language
 def detect_source_language(src_blob: str) -> str:
     raise NotImplementedError(
         "Implement source-language detection here using your team's tooling. "
