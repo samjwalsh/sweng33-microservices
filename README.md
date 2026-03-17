@@ -1,4 +1,4 @@
 # Dependencies
 
 ffmpeg
-rubberband?
+rubberband

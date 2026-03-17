@@ -41,7 +41,7 @@ def detect_source_language(src_blob: str) -> str:
     
     try:
         # Download from Blob Storage
-        download_blob_to_file(src_blob, video_tmp)
+        download_blob_to_file(blob_location=src_blob, output_path=video_tmp)
         
         # Extract Audio (using ffmpeg )
         # only use the first 30 seconds for language ID

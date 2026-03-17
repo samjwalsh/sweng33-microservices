@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
-from kafka_pipeline.blob_helper import download_blob_to_file, upload_file
+from kafka_pipeline.blob_helper import download_blob, download_blob_to_file, upload_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
 KAFKA_DIR = CURRENT_DIR.parent
@@ -20,8 +20,6 @@ from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blo
 
 logger = logging.getLogger("tts-service")
 
-from pathlib import Path
-from blob_helper import download_blob, upload_file
 from src.ml_models.elevenlabs_tts import (clone_voice_from_refs, generate_tts_audio, convert_mp3_to_wav, save_audio_stream )
 from tempfile import TemporaryDirectory
 _VOICE_PROFILE_CACHE: dict[tuple[str, str], str] = {}
@@ -56,7 +54,7 @@ def prepare_voice_clone_training_data(
 
     try:
         # Download source video
-        download_blob_to_file(src_blob, video_tmp)
+        download_blob_to_file(blob_location=src_blob, output_path=video_tmp)
 
         # Construct FFmpeg Filter String
         # want to select segments like: between(t,10,15)+between(t,30,35)
@@ -81,7 +79,13 @@ def prepare_voice_clone_training_data(
         ], check=True, capture_output=True)
 
         # Upload resulting file
-        remote_path = upload_file(str(output_wav), f"voice_cloning/training_{blob_hash}.wav")
+        # store as voice_cloning/training_{blob_hash}.wav in blob storage
+        remote_path = upload_file(
+            local_path=str(output_wav),
+            folder="voice_cloning",
+            blob_name=f"training_{blob_hash}.wav",
+            overwrite=True,
+        )
         
         return remote_path
 
