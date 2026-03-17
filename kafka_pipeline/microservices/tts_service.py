@@ -1,11 +1,30 @@
 import argparse
 import time
+import subprocess
+import logging
+import os
+from pathlib import Path
 from typing import Any
+from kafka.blob_helper import download_blob_to_file, upload_file
 
-from kafka_pipeline.db_helper import are_all_segments_generated, set_tts_generated_blob
-from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
-from kafka_pipeline.payload_validation import PayloadValidationError, validate_tts_payload
-from kafka_pipeline.topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
+CURRENT_DIR = Path(__file__).resolve().parent
+KAFKA_DIR = CURRENT_DIR.parent
+if str(KAFKA_DIR) not in sys.path:
+    sys.path.insert(0, str(KAFKA_DIR))
+
+from db_helper import are_all_segments_generated, set_tts_generated_blob
+from microservice_template import KafkaMicroservice, MessageContext
+from payload_validation import PayloadValidationError, validate_tts_payload
+from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
+
+logger = logging.getLogger("tts-service")
+
+from pathlib import Path
+from blob_helper import download_blob, upload_file
+from src.ml_models.elevenlabs_tts import (clone_voice_from_refs, generate_tts_audio, convert_mp3_to_wav, save_audio_stream )
+from tempfile import TemporaryDirectory
+_VOICE_PROFILE_CACHE: dict[tuple[str, str], str] = {}
+
 
 def select_voice_clone_training_segments(
     segments: list[dict[str, Any]],
@@ -29,10 +48,55 @@ def prepare_voice_clone_training_data(
     src_blob: str,
     training_segments: list[dict[str, Any]],
 ) -> str:
-    raise NotImplementedError(
-        "Implement extraction of source-audio clips for the selected training segments. "
-        "Return a the path to the wav file which contains the selected training segments' audio"
-    )
+    # Setup paths
+    blob_hash = abs(hash(src_blob))
+    video_tmp = Path(f"/tmp/src_{blob_hash}.mp4")
+    output_wav = Path(f"/tmp/training_{blob_hash}.wav")
+
+    try:
+        # Download source video
+        download_blob_to_file(src_blob, video_tmp)
+
+        # Construct FFmpeg Filter String
+        # want to select segments like: between(t,10,15)+between(t,30,35)
+        if not training_segments:
+            raise ValueError("No training segments provided.")
+
+        filter_parts = []
+        for seg in training_segments:
+            start = seg['start']
+            end = seg['end']
+            filter_parts.append(f"between(t,{start},{end})")
+        
+        filter_str = "+".join(filter_parts)
+
+        # Run FFmpeg
+        # extracts audio, filters for the timestamps, and concats them
+        # -ar 22050 -ac 1 is standard for voice cloning models
+        subprocess.run([
+            'ffmpeg', '-i', str(video_tmp),
+            '-af', f'aselect=\'{filter_str}\',asetpts=N/SR/TB',
+            '-ar', '22050', '-ac', '1', str(output_wav), '-y'
+        ], check=True, capture_output=True)
+
+        # Upload resulting file
+        remote_path = upload_file(str(output_wav), f"voice_cloning/training_{blob_hash}.wav")
+        
+        return remote_path
+
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode() if e.stderr else str(e)
+        logger.error(f"FFmpeg error during voice clone prep for {src_blob}: {error_msg}")
+        raise  # Re-raise so the worker knows this task failed
+
+    except Exception as e:
+        logger.error(f"Unexpected failure in voice clone prep for {src_blob}: {str(e)}")
+        raise
+
+    finally:
+        # Cleanup: Always remove local temp files
+        if video_tmp.exists(): video_tmp.unlink()
+        if output_wav.exists(): output_wav.unlink()
 
 
 # This function takes the training audio link and uses it to clone the voice to be used for the next step
@@ -41,11 +105,25 @@ def clone_voice_once(
     src_blob: str,
     training_audio_refs: str,
 ) -> str:
-    raise NotImplementedError(
-        "Implement voice cloning here. "
-        "Use training_audio_refs to create/retrieve one cloned voice profile for this speaker, "
-        "then return its voice_profile_id."
+    cache_key = (src_blob, training_audio_refs)
+
+    if cache_key in _VOICE_PROFILE_CACHE:
+        return _VOICE_PROFILE_CACHE[cache_key]
+
+    def load_audio_bytes(ref: str) -> bytes:
+        ref_path = Path(ref)
+        if ref_path.exists():
+            return ref_path.read_bytes()
+        return download_blob(ref)
+
+    voice_profile_id = clone_voice_from_refs(
+        voice_name=f"clone_{abs(hash(cache_key))}",
+        training_audio_refs=[training_audio_refs],
+        load_audio_bytes=load_audio_bytes,
     )
+
+    _VOICE_PROFILE_CACHE[cache_key] = voice_profile_id
+    return voice_profile_id
 
 
 # This function takes in some text and a voice profile. 
@@ -55,10 +133,28 @@ def synthesize_segment_audio(
     text: str,
     voice_profile_id: str,
 ) -> str:
-    raise NotImplementedError(
-        "Implement segment synthesis here. "
-        "Use voice_profile_id to generate audio for this segment and return the generated blob/path reference."
-    )
+    
+    with TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        mp3_path = tmpdir_path / "segment.mp3"
+        wav_path = tmpdir_path / "segment.wav"
+
+        audio = generate_tts_audio(
+            voice_id=voice_profile_id,
+            text=text,
+        )
+
+        save_audio_stream(audio, mp3_path)
+        convert_mp3_to_wav(
+            mp3_path=mp3_path,
+            wav_path=wav_path,
+        )
+
+        return upload_file(
+            local_path=wav_path,
+            folder="generated/segments",
+            overwrite=True,
+        )
 
 
 def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicroservice) -> None:
