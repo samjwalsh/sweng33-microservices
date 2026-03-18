@@ -17,6 +17,7 @@ python-dotenv
 
 numpy<2.0
 soundfile
+pydub
 azure-ai-translation-text==1.0.0b1
 azure-ai-transcription
 azure-ai-textanalytics

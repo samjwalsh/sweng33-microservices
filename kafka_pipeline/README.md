@@ -145,3 +145,71 @@ Useful options:
 - Translation tries Azure translator first and falls back to passthrough text if unavailable.
 - TTS currently writes generated segment placeholders under `data/generated_segments/` and updates DB.
 - Reconstruction currently validates readiness and logs a TODO for time-stretch/compress + mux.
+
+## Dokploy deployment plan (4 workers)
+
+Use one shared Docker image and create 4 Dokploy services/apps with different start commands.
+
+### Service-specific Dockerfiles (alternative)
+
+If you prefer picking a Dockerfile per app in Dokploy, use:
+
+- `Dockerfile.diarization` -> diarization worker
+- `Dockerfile.translation` -> translation worker
+- `Dockerfile.tts` -> TTS worker
+- `Dockerfile.reconstruction` -> reconstruction worker
+
+Each file already has the correct default `CMD` for its microservice.
+
+### Step 1: Build from repo root
+
+- Dockerfile: `Dockerfile`
+- Env template: `.env.example`
+- Runtime deps included: ffmpeg, ffprobe (via ffmpeg package), rubberband
+
+### Step 2: Create shared environment in Dokploy
+
+Set these variables in Dokploy (copy from `.env.example`):
+
+- `KAFKA_BOOTSTRAP_SERVER`
+- `DATABASE_URL`
+- `AZURE_STORAGE_CONTAINER`
+- `AZURE_STORAGE_CONNECTION_STRING` (or `AZURE_STORAGE_ACCOUNT` + `AZURE_STORAGE_KEY`)
+- `TRANSLATOR_KEY`, `TRANSLATOR_ENDPOINT`, `TRANSLATOR_REGION`
+- `ELEVENLABS_API_KEY`
+- one of `MY_TOKEN` / `HF_TOKEN` / `HUGGINGFACE_HUB_TOKEN`
+
+Optional tuning vars:
+
+- `LANGID_WHISPER_MODEL`
+- `TRANSCRIBER_MODEL`
+- `TRANSCRIBER_CHUNK_LENGTH_S`
+- `TRANSCRIBER_STRIDE_LENGTH_S`
+- `DIARIZATION_DEVICE`
+- `DIARIZATION_NUM_THREADS`
+- `DIARIZATION_MODEL`
+
+### Step 3: Create 4 Dokploy worker apps
+
+Each app uses the same image/build context, with one command:
+
+```bash
+python -m kafka_pipeline.microservices.diarization_service --group-id diarization-v1
+python -m kafka_pipeline.microservices.translation_service --group-id translation-v1
+python -m kafka_pipeline.microservices.tts_service --group-id tts-v1
+python -m kafka_pipeline.microservices.reconstruction_service --group-id reconstruct-v1
+```
+
+### Step 4: Resource sizing (starting point)
+
+- diarization-service: highest RAM/CPU of the four (model load + inference)
+- translation-service: low-medium
+- tts-service: medium
+- reconstruction-service: medium-high (audio/video processing)
+
+### Step 5: Validate end-to-end
+
+1. Deploy all 4 apps.
+2. Publish one ingest event.
+3. Confirm logs show consume -> publish progression across all workers.
+4. Verify DB status counters and generated blob paths update as expected.
