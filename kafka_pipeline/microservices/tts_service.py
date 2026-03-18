@@ -21,9 +21,14 @@ from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blo
 
 logger = logging.getLogger("tts-service")
 
-from src.ml_models.elevenlabs_tts import (clone_voice_from_refs, generate_tts_audio, convert_mp3_to_wav, save_audio_stream )
+from src.ml_models.elevenlabs_tts import (
+    clone_voice_from_refs,
+    convert_mp3_to_wav,
+    delete_voice,
+    generate_tts_audio,
+    save_audio_stream,
+)
 from tempfile import TemporaryDirectory
-_VOICE_PROFILE_CACHE: dict[tuple[str, str, str], str] = {}
 
 
 def _stable_id(value: str, length: int = 16) -> str:
@@ -117,11 +122,6 @@ def clone_voice_once(
     speaker_id: str,
     training_audio_refs: str,
 ) -> str:
-    cache_key = (src_blob, speaker_id, training_audio_refs)
-
-    if cache_key in _VOICE_PROFILE_CACHE:
-        return _VOICE_PROFILE_CACHE[cache_key]
-
     def load_audio_bytes(ref: str) -> bytes:
         ref_path = Path(ref)
         if ref_path.exists():
@@ -129,12 +129,10 @@ def clone_voice_once(
         return download_blob(ref)
 
     voice_profile_id = clone_voice_from_refs(
-        voice_name=f"clone_{_stable_id('|'.join(cache_key), 20)}",
+        voice_name=f"clone_{_stable_id('|'.join((src_blob, speaker_id, training_audio_refs)), 20)}",
         training_audio_refs=[training_audio_refs],
         load_audio_bytes=load_audio_bytes,
     )
-
-    _VOICE_PROFILE_CACHE[cache_key] = voice_profile_id
     return voice_profile_id
 
 
@@ -188,22 +186,35 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
         training_segments=training_segments,
     )
 
-    voice_profile_id = clone_voice_once(
-        src_blob=src_blob,
-        speaker_id=speaker_id,
-        training_audio_refs=training_audio_refs,
-    )
-
-    for segment in segments:
-        gen_blob = synthesize_segment_audio(
-            text=segment["text"],
-            voice_profile_id=voice_profile_id,
-        )
-        set_tts_generated_blob(
+    voice_profile_id: str | None = None
+    try:
+        voice_profile_id = clone_voice_once(
             src_blob=src_blob,
-            segment_id=segment["segment_id"],
-            gen_blob=gen_blob,
+            speaker_id=speaker_id,
+            training_audio_refs=training_audio_refs,
         )
+
+        for segment in segments:
+            gen_blob = synthesize_segment_audio(
+                text=segment["text"],
+                voice_profile_id=voice_profile_id,
+            )
+            set_tts_generated_blob(
+                src_blob=src_blob,
+                segment_id=segment["segment_id"],
+                gen_blob=gen_blob,
+            )
+    finally:
+        if voice_profile_id:
+            try:
+                delete_voice(voice_id=voice_profile_id)
+            except Exception as error:
+                logger.warning(
+                    "Failed to delete temporary ElevenLabs voice %s for src_blob=%s: %s",
+                    voice_profile_id,
+                    src_blob,
+                    error,
+                )
 
     increment_tts_completed_tasks(src_blob=src_blob)
 

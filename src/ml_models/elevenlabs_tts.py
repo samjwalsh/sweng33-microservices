@@ -48,6 +48,14 @@ def clone_voice_from_refs(
     return voice.voice_id
 
 
+def delete_voice(
+    *,
+    voice_id: str,
+) -> None:
+    client = get_eleven_client()
+    client.voices.delete(voice_id=voice_id)
+
+
 def generate_tts_audio(
     *,
     voice_id: str,
