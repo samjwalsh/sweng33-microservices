@@ -86,6 +86,68 @@ def stitch_audio_with_timestamps(segments_info: list[dict], output_path: str | P
     combined.export(output_path, format="wav")
     return output_path
 
+
+def compose_audio_with_mute_and_overlay(
+    base_wav_path: str | Path,
+    segments_info: list[dict],
+    output_path: str | Path,
+) -> str:
+    """
+    Build final audio timeline from original audio plus translated clips.
+
+    Policy:
+    - keep original audio outside translated windows
+    - mute original audio inside each translated window
+    - overlay translated clip at the segment start
+    """
+    base_wav_path = Path(base_wav_path)
+    output_path = Path(output_path)
+
+    if not base_wav_path.exists():
+        raise FileNotFoundError(f"Base audio not found: {base_wav_path}")
+
+    base = AudioSegment.from_file(base_wav_path)
+    total_ms = len(base)
+
+    sorted_segments = sorted(segments_info, key=lambda item: item["start"])
+
+    for info in sorted_segments:
+        clip_path = Path(info["path"])
+        if not clip_path.exists():
+            continue
+
+        start_ms = max(0, int(float(info["start"]) * 1000))
+        end_ms = max(start_ms, int(float(info["end"]) * 1000))
+
+        if start_ms >= total_ms:
+            continue
+
+        end_ms = min(end_ms, total_ms)
+        window_ms = end_ms - start_ms
+        if window_ms <= 0:
+            continue
+
+        clip = AudioSegment.from_file(clip_path)
+        clip = clip.set_frame_rate(base.frame_rate).set_channels(base.channels).set_sample_width(base.sample_width)
+
+        if len(clip) > window_ms:
+            clip = clip[:window_ms]
+        elif len(clip) < window_ms:
+            pad = AudioSegment.silent(duration=window_ms - len(clip), frame_rate=base.frame_rate)
+            pad = pad.set_channels(base.channels).set_sample_width(base.sample_width)
+            clip = clip + pad
+
+        silence = AudioSegment.silent(duration=window_ms, frame_rate=base.frame_rate)
+        silence = silence.set_channels(base.channels).set_sample_width(base.sample_width)
+
+        # Later segments overwrite overlap regions by re-muting then overlaying.
+        base = base[:start_ms] + silence + base[end_ms:]
+        base = base.overlay(clip, position=start_ms)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    base.export(output_path, format="wav")
+    return str(output_path)
+
 def get_audio_snippet(input_wav: str | Path, start_sec: float, end_sec: float, output_path: str | Path):
     audio = AudioSegment.from_file(input_wav)
     snippet = audio[start_sec * 1000 : end_sec * 1000]

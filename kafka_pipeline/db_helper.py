@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import psycopg
+from psycopg import sql
 from dotenv import load_dotenv
 
 
@@ -136,3 +137,92 @@ def get_segments_for_src_blob(src_blob: str) -> list[TTSSegment]:
             rows = cur.fetchall()
 
     return [_to_segment(row) for row in rows]
+
+
+def set_video_completed_blob(*, src_blob: str, completed_blob: str) -> bool:
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE "pg-drizzle_videos"
+                SET completed_blob = %s,
+                    status = 'done'
+                WHERE blob = %s;
+                """,
+                (completed_blob, src_blob),
+            )
+            updated = cur.rowcount > 0
+        conn.commit()
+    return updated
+
+
+def _increment_video_task_counter(*, src_blob: str, column_name: str) -> bool:
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            query = sql.SQL(
+                """
+                UPDATE "pg-drizzle_videos"
+                SET {column} = COALESCE({column}, 0) + 1
+                WHERE blob = %s;
+                """
+            ).format(column=sql.Identifier(column_name))
+            cur.execute(query, (src_blob,))
+            updated = cur.rowcount > 0
+        conn.commit()
+    return updated
+
+
+def increment_diarization_total_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="diarization_total_tasks",
+    )
+
+
+def increment_diarization_completed_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="diarization_completed_tasks",
+    )
+
+
+def increment_translation_total_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="translation_total_tasks",
+    )
+
+
+def increment_translation_completed_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="translation_completed_tasks",
+    )
+
+
+def increment_tts_total_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="tts_total_tasks",
+    )
+
+
+def increment_tts_completed_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="tts_completed_tasks",
+    )
+
+
+def increment_reconstruction_total_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="reconstruction_total_tasks",
+    )
+
+
+def increment_reconstruction_completed_tasks(*, src_blob: str) -> bool:
+    return _increment_video_task_counter(
+        src_blob=src_blob,
+        column_name="reconstruction_completed_tasks",
+    )

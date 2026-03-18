@@ -27,6 +27,8 @@ wheels/
 *.egg
 MANIFEST
 
+data/english_video.mp4
+
 .venv/
 venv/
 env/

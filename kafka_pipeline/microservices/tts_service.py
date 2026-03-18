@@ -3,27 +3,31 @@ import time
 import subprocess
 import logging
 import os
+import sys
+import hashlib
 from pathlib import Path
 from typing import Any
-from kafka.blob_helper import download_blob_to_file, upload_file
+from kafka_pipeline.blob_helper import download_blob, download_blob_to_file, upload_file
 
 CURRENT_DIR = Path(__file__).resolve().parent
 KAFKA_DIR = CURRENT_DIR.parent
 if str(KAFKA_DIR) not in sys.path:
     sys.path.insert(0, str(KAFKA_DIR))
 
-from db_helper import are_all_segments_generated, set_tts_generated_blob
+from db_helper import are_all_segments_generated, set_tts_generated_blob, increment_tts_completed_tasks, increment_reconstruction_total_tasks
 from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_tts_payload
 from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
 
 logger = logging.getLogger("tts-service")
 
-from pathlib import Path
-from blob_helper import download_blob, upload_file
 from src.ml_models.elevenlabs_tts import (clone_voice_from_refs, generate_tts_audio, convert_mp3_to_wav, save_audio_stream )
 from tempfile import TemporaryDirectory
-_VOICE_PROFILE_CACHE: dict[tuple[str, str], str] = {}
+_VOICE_PROFILE_CACHE: dict[tuple[str, str, str], str] = {}
+
+
+def _stable_id(value: str, length: int = 16) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
 
 
 def select_voice_clone_training_segments(
@@ -46,16 +50,17 @@ def select_voice_clone_training_segments(
 def prepare_voice_clone_training_data(
     *,
     src_blob: str,
+    speaker_id: str,
     training_segments: list[dict[str, Any]],
 ) -> str:
     # Setup paths
-    blob_hash = abs(hash(src_blob))
-    video_tmp = Path(f"/tmp/src_{blob_hash}.mp4")
-    output_wav = Path(f"/tmp/training_{blob_hash}.wav")
+    blob_key = _stable_id(f"{src_blob}|{speaker_id}")
+    video_tmp = Path(f"/tmp/src_{blob_key}.mp4")
+    output_wav = Path(f"/tmp/training_{blob_key}.wav")
 
     try:
         # Download source video
-        download_blob_to_file(src_blob, video_tmp)
+        download_blob_to_file(blob_location=src_blob, output_path=video_tmp)
 
         # Construct FFmpeg Filter String
         # want to select segments like: between(t,10,15)+between(t,30,35)
@@ -80,7 +85,13 @@ def prepare_voice_clone_training_data(
         ], check=True, capture_output=True)
 
         # Upload resulting file
-        remote_path = upload_file(str(output_wav), f"voice_cloning/training_{blob_hash}.wav")
+        # store as voice_cloning/training_{blob_key}.wav in blob storage
+        remote_path = upload_file(
+            local_path=str(output_wav),
+            folder="voice_cloning",
+            blob_name=f"training_{blob_key}.wav",
+            overwrite=True,
+        )
         
         return remote_path
 
@@ -103,9 +114,10 @@ def prepare_voice_clone_training_data(
 def clone_voice_once(
     *,
     src_blob: str,
+    speaker_id: str,
     training_audio_refs: str,
 ) -> str:
-    cache_key = (src_blob, training_audio_refs)
+    cache_key = (src_blob, speaker_id, training_audio_refs)
 
     if cache_key in _VOICE_PROFILE_CACHE:
         return _VOICE_PROFILE_CACHE[cache_key]
@@ -117,7 +129,7 @@ def clone_voice_once(
         return download_blob(ref)
 
     voice_profile_id = clone_voice_from_refs(
-        voice_name=f"clone_{abs(hash(cache_key))}",
+        voice_name=f"clone_{_stable_id('|'.join(cache_key), 20)}",
         training_audio_refs=[training_audio_refs],
         load_audio_bytes=load_audio_bytes,
     )
@@ -172,11 +184,13 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
 
     training_audio_refs = prepare_voice_clone_training_data(
         src_blob=src_blob,
+        speaker_id=speaker_id,
         training_segments=training_segments,
     )
 
     voice_profile_id = clone_voice_once(
         src_blob=src_blob,
+        speaker_id=speaker_id,
         training_audio_refs=training_audio_refs,
     )
 
@@ -191,12 +205,15 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
             gen_blob=gen_blob,
         )
 
+    increment_tts_completed_tasks(src_blob=src_blob)
+
     if are_all_segments_generated(src_blob):
         service.publish(
             topic=TOPIC_RECONSTRUCT_VIDEO,
             key=key_by_src_blob(src_blob),
             value={"src_blob": src_blob},
         )
+        increment_reconstruction_total_tasks(src_blob=src_blob)
 
     print(
         f"[{service.service_name}] Processed speaker={speaker_id} "

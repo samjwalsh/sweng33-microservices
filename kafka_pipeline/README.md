@@ -4,7 +4,7 @@ You should see messages printed by the consumer.
 
 ### 1) Send a message to a queue/topic
 
-Use `kafka/pipeline_producer.py` and call `send_kafka_message`:
+Use `kafka_pipeline/pipeline_producer.py` and call `send_kafka_message`:
 
 ```python
 from pipeline_producer import send_kafka_message
@@ -24,7 +24,7 @@ print(metadata)
 
 ### 2) Create a microservice consumer quickly
 
-Use `kafka/microservice_template.py` as a wrapper/template. It gives you:
+Use `kafka_pipeline/microservice_template.py` as a wrapper/template. It gives you:
 
 - a configured `KafkaConsumer`
 - a configured `KafkaProducer`
@@ -34,7 +34,7 @@ Use `kafka/microservice_template.py` as a wrapper/template. It gives you:
 Run the template service:
 
 ```bash
-python kafka/microservice_template.py --input-topic text_to_speech --group-id tts-worker
+python kafka_pipeline/microservice_template.py --input-topic text_to_speech --group-id tts-worker
 ```
 
 Replace `example_handler` with your real business logic and publish downstream events via `service.publish(...)`.
@@ -47,7 +47,7 @@ Replace `example_handler` with your real business logic and publish downstream e
 
 ## Added helper modules
 
-### `kafka/topics.py`
+### `kafka_pipeline/topics.py`
 
 - Topic constants:
   - `TOPIC_INGEST`
@@ -58,7 +58,7 @@ Replace `example_handler` with your real business logic and publish downstream e
   - `key_by_src_blob(src_blob)`
   - `key_by_src_blob_and_speaker(src_blob, speaker_id)`
 
-### `kafka/db_helper.py`
+### `kafka_pipeline/db_helper.py`
 
 Postgres helper for the `tts` table using `DATABASE_URL` from `.env`.
 
@@ -73,23 +73,23 @@ Functions:
 
 Implemented workers:
 
-- `kafka/microservices/diarization_service.py`
-- `kafka/microservices/translation_service.py`
-- `kafka/microservices/tts_service.py`
-- `kafka/microservices/reconstruction_service.py`
+- `kafka_pipeline/microservices/diarization_service.py`
+- `kafka_pipeline/microservices/translation_service.py`
+- `kafka_pipeline/microservices/tts_service.py`
+- `kafka_pipeline/microservices/reconstruction_service.py`
 
 Shared support:
 
-- `kafka/payload_validation.py`
-- `kafka/topics.py`
+- `kafka_pipeline/payload_validation.py`
+- `kafka_pipeline/topics.py`
 
 ### Run order (separate terminals)
 
 ```bash
-python kafka/microservices/reconstruction_service.py --group-id reconstruct-v1
-python kafka/microservices/tts_service.py --group-id tts-v1
-python kafka/microservices/translation_service.py --group-id translation-v1
-python kafka/microservices/diarization_service.py --group-id diarization-v1
+python -m kafka_pipeline.microservices.diarization_service --group-id diarization-v1
+python -m kafka_pipeline.microservices.translation_service --group-id translation-v1
+python -m kafka_pipeline.microservices.tts_service --group-id tts-v1
+python -m kafka_pipeline.microservices.reconstruction_service --group-id reconstruct-v1
 ```
 
 ### Send an ingest event
@@ -115,21 +115,21 @@ send_kafka_message(
 
 ### Create test jobs for all microservice queues
 
-Use `kafka/microservices_job_creator.py` to publish valid test jobs to one queue or all queues.
+Use `kafka_pipeline/microservices_job_creator.py` to publish valid test jobs to one queue or all queues.
 
 Publish to all queues:
 
 ```bash
-python kafka/microservices_job_creator.py --target all
+python kafka_pipeline/microservices_job_creator.py --target all
 ```
 
 Publish only to one queue (examples):
 
 ```bash
-python kafka/microservices_job_creator.py --target ingest
-python kafka/microservices_job_creator.py --target translate
-python kafka/microservices_job_creator.py --target tts --tts-speaker-id speaker_0
-python kafka/microservices_job_creator.py --target reconstruct
+python kafka_pipeline/microservices_job_creator.py --target ingest
+python kafka_pipeline/microservices_job_creator.py --target translate
+python kafka_pipeline/microservices_job_creator.py --target tts --tts-speaker-id speaker_0
+python kafka_pipeline/microservices_job_creator.py --target reconstruct
 ```
 
 Useful options:
@@ -145,3 +145,71 @@ Useful options:
 - Translation tries Azure translator first and falls back to passthrough text if unavailable.
 - TTS currently writes generated segment placeholders under `data/generated_segments/` and updates DB.
 - Reconstruction currently validates readiness and logs a TODO for time-stretch/compress + mux.
+
+## Dokploy deployment plan (4 workers)
+
+Use one shared Docker image and create 4 Dokploy services/apps with different start commands.
+
+### Service-specific Dockerfiles (alternative)
+
+If you prefer picking a Dockerfile per app in Dokploy, use:
+
+- `Dockerfile.diarization` -> diarization worker
+- `Dockerfile.translation` -> translation worker
+- `Dockerfile.tts` -> TTS worker
+- `Dockerfile.reconstruction` -> reconstruction worker
+
+Each file already has the correct default `CMD` for its microservice.
+
+### Step 1: Build from repo root
+
+- Dockerfile: `Dockerfile`
+- Env template: `.env.example`
+- Runtime deps included: ffmpeg, ffprobe (via ffmpeg package), rubberband
+
+### Step 2: Create shared environment in Dokploy
+
+Set these variables in Dokploy (copy from `.env.example`):
+
+- `KAFKA_BOOTSTRAP_SERVER`
+- `DATABASE_URL`
+- `AZURE_STORAGE_CONTAINER`
+- `AZURE_STORAGE_CONNECTION_STRING` (or `AZURE_STORAGE_ACCOUNT` + `AZURE_STORAGE_KEY`)
+- `TRANSLATOR_KEY`, `TRANSLATOR_ENDPOINT`, `TRANSLATOR_REGION`
+- `ELEVENLABS_API_KEY`
+- one of `MY_TOKEN` / `HF_TOKEN` / `HUGGINGFACE_HUB_TOKEN`
+
+Optional tuning vars:
+
+- `LANGID_WHISPER_MODEL`
+- `TRANSCRIBER_MODEL`
+- `TRANSCRIBER_CHUNK_LENGTH_S`
+- `TRANSCRIBER_STRIDE_LENGTH_S`
+- `DIARIZATION_DEVICE`
+- `DIARIZATION_NUM_THREADS`
+- `DIARIZATION_MODEL`
+
+### Step 3: Create 4 Dokploy worker apps
+
+Each app uses the same image/build context, with one command:
+
+```bash
+python -m kafka_pipeline.microservices.diarization_service --group-id diarization-v1
+python -m kafka_pipeline.microservices.translation_service --group-id translation-v1
+python -m kafka_pipeline.microservices.tts_service --group-id tts-v1
+python -m kafka_pipeline.microservices.reconstruction_service --group-id reconstruct-v1
+```
+
+### Step 4: Resource sizing (starting point)
+
+- diarization-service: highest RAM/CPU of the four (model load + inference)
+- translation-service: low-medium
+- tts-service: medium
+- reconstruction-service: medium-high (audio/video processing)
+
+### Step 5: Validate end-to-end
+
+1. Deploy all 4 apps.
+2. Publish one ingest event.
+3. Confirm logs show consume -> publish progression across all workers.
+4. Verify DB status counters and generated blob paths update as expected.

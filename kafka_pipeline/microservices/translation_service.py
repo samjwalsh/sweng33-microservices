@@ -10,7 +10,7 @@ from azure.ai.translation.text import TextTranslationClient, TranslatorCredentia
 from azure.ai.translation.text.models import InputTextItem
 
 
-from kafka_pipeline.db_helper import upsert_tts_placeholder
+from kafka_pipeline.db_helper import upsert_tts_placeholder, increment_translation_completed_tasks, increment_tts_total_tasks
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_translate_payload
 from kafka_pipeline.topics import TOPIC_TEXT_TO_SPEECH, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob_and_speaker
@@ -75,8 +75,21 @@ def translate_segment_text(text: str, src_lang: str, dest_lang: str) -> str:
 
 
 def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicroservice) -> None:
+    # Filter out segments with empty or non-string `text` before validating.
+    raw_segments = payload.get("segments", [])
+    non_empty_segments = [
+        s for s in raw_segments
+        if isinstance(s.get("text"), str) and s.get("text").strip() != ""
+    ]
+
+    if not non_empty_segments:
+        print(f"[{service.service_name}] No non-empty segments to process at offset={context.offset}; skipping")
+        return
+
+    # Validate using a payload copy that only contains non-empty segments
+    payload_for_validation = {**payload, "segments": non_empty_segments}
     try:
-        validate_translate_payload(payload)
+        validate_translate_payload(payload_for_validation)
     except PayloadValidationError as error:
         print(f"[{service.service_name}] Invalid payload at offset={context.offset}: {error}")
         return
@@ -84,7 +97,7 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
     src_blob = payload["src_blob"]
     src_lang = payload["src_lang"]
     dest_lang = payload["dest_lang"]
-    segments = payload["segments"]
+    segments = non_empty_segments
 
     translated_segments = []
     for segment in segments:
@@ -120,6 +133,9 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
             key=key_by_src_blob_and_speaker(src_blob, speaker_id),
             value=outbound,
         )
+        increment_tts_total_tasks(src_blob=src_blob)
+
+    increment_translation_completed_tasks(src_blob=src_blob)
 
     print(
         f"[{service.service_name}] Processed {len(segments)} segments and "
