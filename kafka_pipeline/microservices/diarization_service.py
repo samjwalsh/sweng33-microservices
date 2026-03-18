@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from dotenv import load_dotenv
 
 from kafka_pipeline.blob_helper import download_blob_to_file
+from kafka_pipeline.db_helper import increment_diarization_completed_tasks, increment_translation_total_tasks
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_ingest_payload
 from kafka_pipeline.topics import TOPIC_INGEST, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob
@@ -183,11 +184,17 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
         "dest_lang": payload["dest_lang"],
         "segments": segments,
     }
+
     service.publish(
         topic=TOPIC_TRANSLATE_SEGMENTS,
         key=key_by_src_blob(src_blob),
         value=outbound,
     )
+
+    increment_diarization_completed_tasks(src_blob=src_blob)
+
+    increment_translation_total_tasks(src_blob=src_blob)
+
     print(
         f"[{service.service_name}] Published {len(segments)} segments "
         f"for src_blob={src_blob} from offset={context.offset}"

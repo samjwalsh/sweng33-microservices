@@ -14,7 +14,7 @@ KAFKA_DIR = CURRENT_DIR.parent
 if str(KAFKA_DIR) not in sys.path:
     sys.path.insert(0, str(KAFKA_DIR))
 
-from db_helper import are_all_segments_generated, set_tts_generated_blob
+from db_helper import are_all_segments_generated, set_tts_generated_blob, increment_tts_completed_tasks, increment_reconstruction_total_tasks
 from microservice_template import KafkaMicroservice, MessageContext
 from payload_validation import PayloadValidationError, validate_tts_payload
 from topics import TOPIC_RECONSTRUCT_VIDEO, TOPIC_TEXT_TO_SPEECH, key_by_src_blob
@@ -205,12 +205,15 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
             gen_blob=gen_blob,
         )
 
+    increment_tts_completed_tasks(src_blob=src_blob)
+
     if are_all_segments_generated(src_blob):
         service.publish(
             topic=TOPIC_RECONSTRUCT_VIDEO,
             key=key_by_src_blob(src_blob),
             value={"src_blob": src_blob},
         )
+        increment_reconstruction_total_tasks(src_blob=src_blob)
 
     print(
         f"[{service.service_name}] Processed speaker={speaker_id} "

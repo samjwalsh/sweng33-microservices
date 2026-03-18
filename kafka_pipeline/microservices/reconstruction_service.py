@@ -9,7 +9,7 @@ import tempfile
 
 from typing import Optional, Union
 
-from kafka_pipeline.db_helper import TTSSegment, get_segments_for_src_blob, set_video_completed_blob
+from kafka_pipeline.db_helper import TTSSegment, get_segments_for_src_blob, set_video_completed_blob, increment_reconstruction_completed_tasks
 from kafka_pipeline.audio_utils import compose_audio_with_mute_and_overlay, extract_audio, merge_audio
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_reconstruct_payload
@@ -183,6 +183,8 @@ def handler(payload: dict, context: MessageContext, service: KafkaMicroservice) 
         print(
             f"[{service.service_name}] Could not update completed_blob for src_blob={src_blob}"
         )
+    else:
+        increment_reconstruction_completed_tasks(src_blob=src_blob)
 
     print(
         f"[{service.service_name}] Reconstructed src_blob={src_blob} "

@@ -10,7 +10,7 @@ from azure.ai.translation.text import TextTranslationClient, TranslatorCredentia
 from azure.ai.translation.text.models import InputTextItem
 
 
-from kafka_pipeline.db_helper import upsert_tts_placeholder
+from kafka_pipeline.db_helper import upsert_tts_placeholder, increment_translation_completed_tasks, increment_tts_total_tasks
 from kafka_pipeline.microservice_template import KafkaMicroservice, MessageContext
 from kafka_pipeline.payload_validation import PayloadValidationError, validate_translate_payload
 from kafka_pipeline.topics import TOPIC_TEXT_TO_SPEECH, TOPIC_TRANSLATE_SEGMENTS, key_by_src_blob_and_speaker
@@ -133,6 +133,9 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
             key=key_by_src_blob_and_speaker(src_blob, speaker_id),
             value=outbound,
         )
+        increment_tts_total_tasks(src_blob=src_blob)
+
+    increment_translation_completed_tasks(src_blob=src_blob)
 
     print(
         f"[{service.service_name}] Processed {len(segments)} segments and "
