@@ -3,11 +3,6 @@ from pathlib import Path
 from pydub import AudioSegment
 from audio_utils import extract_wav_snippet
 
-diarisation_output = [
-    {"speaker": "SPEAKER_00", "start": 0.5, "end": 2.0},
-    {"speaker": "SPEAKER_01", "start": 2.2, "end": 4.0},
-    {"speaker": "SPEAKER_00", "start": 5.0, "end": 6.5},
-]
 
 def group_segments_by_speaker(diarisation_output: list[dict]) -> dict[int, list[dict]]:
     "Based on the diarisation output, groups segments together by speaker, returns a dict mapping speaker_id to list of segments"
@@ -43,6 +38,7 @@ def cut_segments_from_audio(segments: list[dict], audio_path: str, temp_dir: str
     
     return cut_audio_paths
 
+
 def combine_segments_for_speaker(segments: list[str | Path], output_wav: str | Path) -> None:
 
     output_wav = Path(output_wav)
@@ -57,7 +53,7 @@ def combine_segments_for_speaker(segments: list[str | Path], output_wav: str | P
     combined_audio.export(output_wav, format="wav")
     
        
-       
+ 
 def compile_voice_cloning_samples(diarisation_output: list[dict], audio_path: str | Path, output_dir: str | Path) -> list[Path]:
 
     output_dir = Path(output_dir)
