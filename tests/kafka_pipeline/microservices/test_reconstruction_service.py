@@ -215,7 +215,7 @@ def test_reconstruct_video_success(monkeypatch):
 def test_reconstruct_video_skips_failed_and_non_positive_segments(monkeypatch, capsys):
     class FakeTempDir:
         def __enter__(self):
-            path = Path("/tmp/reconstruct")
+            path = Path("/tmp/reconstruct_skip_case")
             path.mkdir(parents=True, exist_ok=True)
             return str(path)
 
@@ -256,7 +256,7 @@ def test_reconstruct_video_skips_failed_and_non_positive_segments(monkeypatch, c
     assert result == "out.mp4"
     assert compose_args == [[
         {
-            "path": "/tmp/reconstruct/wavs/fitted_3.wav",
+            "path": "/tmp/reconstruct_skip_case/wavs/fitted_3.wav",
             "start": 2.0,
             "end": 3.0,
         }
