@@ -167,12 +167,12 @@ def handler(payload: dict[str, Any], context: MessageContext, service: KafkaMicr
         print(f"[{service.service_name}] Invalid payload at offset={context.offset}: {error}")
         return
 
-    increment_diarization_total_tasks(src_blob=src_blob)
-
     src_blob = payload["src_blob"]
     src_lang = payload.get("src_lang")
     if src_lang is None:
         src_lang = detect_source_language(src_blob)
+
+    increment_diarization_total_tasks(src_blob=src_blob)
 
     segments = diarize_and_transcribe(src_blob=src_blob, src_lang=src_lang)
 
