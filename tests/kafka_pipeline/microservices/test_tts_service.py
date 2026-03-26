@@ -521,4 +521,4 @@ def test_main_builds_service_and_runs(monkeypatch):
         "bootstrap_server": "broker:9092",
         "from_beginning": True,
     }
-    assert handler is tts.handlerpytest
+    assert handler is tts.handler

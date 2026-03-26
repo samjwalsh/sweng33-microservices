@@ -201,7 +201,7 @@ def test_serialize_for_log_non_jsonable_uses_repr(patched_kafka):
 
     result = service._serialize_for_log({1, 2, 3})
 
-    assert result == repr({1, 2, 3})
+    assert result == json.dumps({1, 2, 3}, ensure_ascii=False, default=str)
 
 
 def test_stop_sets_running_false(patched_kafka):

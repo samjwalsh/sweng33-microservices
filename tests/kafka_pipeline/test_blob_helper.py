@@ -21,6 +21,8 @@ class DummyBlobClient:
         return DummyDownload(self.content)
 
     def upload_blob(self, data, overwrite=False):
+        if hasattr(data, "read"):
+            data = data.read()
         self.upload_calls.append({"data": data, "overwrite": overwrite})
 
 
@@ -240,7 +242,7 @@ def test_upload_file_with_explicit_blob_name(tmp_path, monkeypatch):
     ]
     assert len(blob_client.upload_calls) == 1
     assert blob_client.upload_calls[0]["overwrite"] is False
-    uploaded_data = blob_client.upload_calls[0]["data"].read()
+    uploaded_data = blob_client.upload_calls[0]["data"]
     assert uploaded_data == b"hello file"
 
 

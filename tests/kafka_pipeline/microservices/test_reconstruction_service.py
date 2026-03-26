@@ -128,7 +128,9 @@ def test_reconstruct_video_success(monkeypatch):
 
     class FakeTempDir:
         def __enter__(self):
-            return "/tmp/reconstruct"
+            path = Path("/tmp/reconstruct")
+            path.mkdir(parents=True, exist_ok=True)
+            return str(path)
 
         def __exit__(self, exc_type, exc, tb):
             return False
@@ -213,7 +215,9 @@ def test_reconstruct_video_success(monkeypatch):
 def test_reconstruct_video_skips_failed_and_non_positive_segments(monkeypatch, capsys):
     class FakeTempDir:
         def __enter__(self):
-            return "/tmp/reconstruct"
+            path = Path("/tmp/reconstruct")
+            path.mkdir(parents=True, exist_ok=True)
+            return str(path)
 
         def __exit__(self, exc_type, exc, tb):
             return False

@@ -122,7 +122,9 @@ class FakeAudio2:
         return self.duration
 
     def __getitem__(self, item):
-        return FakeAudio2(item.stop - item.start)
+        start = 0 if item.start is None else item.start
+        stop = self.duration if item.stop is None else item.stop
+        return FakeAudio2(stop - start)
 
     def __add__(self, other):
         return FakeAudio2(self.duration + other.duration)
