@@ -2,7 +2,6 @@ import argparse
 import time
 import subprocess
 import logging
-import os
 import sys
 import hashlib
 from pathlib import Path
@@ -111,8 +110,10 @@ def prepare_voice_clone_training_data(
 
     finally:
         # Cleanup: Always remove local temp files
-        if video_tmp.exists(): video_tmp.unlink()
-        if output_wav.exists(): output_wav.unlink()
+        if video_tmp.exists(): 
+            video_tmp.unlink()
+        if output_wav.exists(): 
+            output_wav.unlink()
 
 
 # This function takes the training audio link and uses it to clone the voice to be used for the next step

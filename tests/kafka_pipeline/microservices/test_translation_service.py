@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 
-import pytest
 
 from kafka_pipeline.microservices import translation_service as ts
 

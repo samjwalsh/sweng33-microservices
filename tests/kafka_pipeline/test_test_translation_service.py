@@ -1,4 +1,3 @@
-import sys
 import types
 
 from kafka_pipeline import test_translation_service as manual_test

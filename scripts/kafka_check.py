@@ -6,12 +6,11 @@ Usage: set KAFKA_BOOTSTRAP_SERVER or rely on default in this repo's .env
 from __future__ import annotations
 
 import os
-import sys
 from typing import Iterable
 
 try:
     from kafka import KafkaAdminClient, KafkaConsumer, TopicPartition
-except Exception as exc:  # pragma: no cover - runtime dependency
+except Exception:  # pragma: no cover - runtime dependency
     print("Missing kafka library (kafka-python). Install with: pip install kafka-python")
     raise
 

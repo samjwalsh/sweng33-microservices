@@ -1,5 +1,4 @@
 import pytest
-from unittest.mock import Mock
 
 from kafka_pipeline import pipeline_producer as pp
 
