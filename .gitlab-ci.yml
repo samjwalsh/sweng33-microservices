@@ -1,3 +1,10 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
   - lint
   - test
@@ -25,7 +32,6 @@ default:
     - pip install "numpy<2.0"
     - pip install --no-build-isolation -r requirements.txt
 
-
 lint:
   stage: lint
   script:
@@ -39,11 +45,11 @@ test:
     - source .venv/bin/activate
     - pip install pytest pytest-cov
     - pytest tests/ -v
-        --cov=.
-        --cov-report=term-missing
-        --cov-report=xml:coverage.xml
-        --junitxml=report.xml
-        --tb=short
+      --cov=.
+      --cov-report=term-missing
+      --cov-report=xml:coverage.xml
+      --junitxml=report.xml
+      --tb=short
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     when: always
