@@ -6,26 +6,90 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
-- build
-- test
-- deploy
-- review
-- dast
-- staging
-- canary
-- production
-- incremental rollout 10%
-- incremental rollout 25%
-- incremental rollout 50%
-- incremental rollout 100%
-- performance
-- cleanup
-- secret-detection
-sast:
-  stage: test
-include:
-- template: Auto-DevOps.gitlab-ci.yml
+  - lint
+  - test
+  - coverage
+
 variables:
-  SECRET_DETECTION_ENABLED: 'true'
-secret_detection:
-  stage: secret-detection
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONPATH: ".:kafka/microservices"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .cache/pip
+
+default:
+  image: python:3.11-slim
+  tags:
+    - docker
+
+  before_script:
+    - apt-get update -y && apt-get install -y --no-install-recommends ffmpeg git libsndfile1 libsndfile1-dev librubberband-dev rubberband-cli pkg-config build-essential
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip
+    - pip install "numpy<2.0"
+    - pip install --no-build-isolation -r requirements.txt
+
+lint:
+  stage: lint
+  script:
+    - source .venv/bin/activate
+    - pip install ruff
+    - ruff check .
+
+test:
+  stage: test
+  script:
+    - source .venv/bin/activate
+    - pip install pytest pytest-cov
+    - pytest tests/ -v
+      --cov=.
+      --cov-report=term-missing
+      --cov-report=xml:coverage.xml
+      --junitxml=report.xml
+      --tb=short
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - report.xml
+    expire_in: 30 days
+
+coverage:
+  stage: coverage
+  script:
+    - source .venv/bin/activate
+    - pip install xmltodict
+    - |
+      python - <<'EOF'
+      import xmltodict
+
+      with open("coverage.xml") as f:
+          coverage_xml = xmltodict.parse(f.read())
+
+      totals = coverage_xml['coverage']['@line-rate']
+      current_coverage = float(totals) * 100
+
+      with open("coverage_baseline.txt") as f:
+          baseline = float(f.read().strip())
+
+      print(f"Current coverage: {current_coverage:.2f}%")
+      print(f"Baseline coverage: {baseline:.2f}%")
+
+      if current_coverage < baseline:
+          print("Coverage decreased! Failing CI.")
+          exit(1)
+      else:
+          print("Coverage check passed!")
+      EOF
+  dependencies:
+    - test
+  allow_failure: false
